@@ -31,20 +31,29 @@ const StatCard = ({ title, value, icon: Icon, color, trend }: any) => (
     animate={{ opacity: 1, y: 0 }}
     transition={{ duration: 0.3 }}
   >
-    <Card className="hover:shadow-lg transition-all duration-300 border-l-4" style={{ borderLeftColor: color }}>
+    <Card className="hover:shadow-md transition-all duration-300 border-none relative overflow-hidden group">
+      <div 
+        className="absolute left-0 top-0 bottom-0 w-1.5" 
+        style={{ backgroundColor: color }}
+      />
       <CardContent className="p-6">
         <div className="flex items-center justify-between">
-          <div>
-            <p className="text-sm font-medium text-muted-foreground">{title}</p>
-            <h3 className="text-3xl font-bold font-display mt-2">{value}</h3>
+          <div className="space-y-1">
+            <p className="text-sm font-semibold text-muted-foreground tracking-tight">{title}</p>
+            <h3 className="text-3xl font-extrabold tracking-tight text-foreground">{value}</h3>
             {trend && (
-              <p className="text-xs mt-2 text-green-600 font-medium">
-                +{trend}% from last week
-              </p>
+              <div className="flex items-center gap-1.5 mt-2">
+                <span className="flex items-center justify-center w-5 h-5 rounded-full bg-green-100 text-green-700">
+                  <CheckCircle2 className="w-3 h-3" />
+                </span>
+                <p className="text-xs font-bold text-green-600">
+                  +{trend}% <span className="text-muted-foreground font-normal">vs last week</span>
+                </p>
+              </div>
             )}
           </div>
-          <div className="p-3 rounded-xl bg-muted/50" style={{ color: color }}>
-            <Icon className="h-6 w-6" />
+          <div className="p-4 rounded-2xl bg-muted/30 group-hover:bg-muted/50 transition-colors" style={{ color: color }}>
+            <Icon className="h-7 w-7 stroke-[2.5px]" />
           </div>
         </div>
       </CardContent>
@@ -87,20 +96,35 @@ export default function Dashboard() {
                 <AreaChart data={data}>
                   <defs>
                     <linearGradient id="colorDockets" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3}/>
-                      <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                      <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3}/>
+                      <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0}/>
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
-                  <XAxis dataKey="name" axisLine={false} tickLine={false} />
-                  <YAxis axisLine={false} tickLine={false} />
+                  <XAxis 
+                    dataKey="name" 
+                    axisLine={false} 
+                    tickLine={false} 
+                    tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
+                  />
+                  <YAxis 
+                    axisLine={false} 
+                    tickLine={false} 
+                    tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
+                  />
                   <Tooltip 
-                    contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                    contentStyle={{ 
+                      borderRadius: '12px', 
+                      border: '1px solid hsl(var(--border))', 
+                      boxShadow: 'var(--shadow-md)',
+                      backgroundColor: 'hsl(var(--card))',
+                      color: 'hsl(var(--card-foreground))'
+                    }}
                   />
                   <Area 
                     type="monotone" 
                     dataKey="dockets" 
-                    stroke="#3b82f6" 
+                    stroke="hsl(var(--primary))" 
                     fillOpacity={1} 
                     fill="url(#colorDockets)" 
                     strokeWidth={3}
@@ -124,13 +148,28 @@ export default function Dashboard() {
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={data}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
-                  <XAxis dataKey="name" axisLine={false} tickLine={false} />
-                  <YAxis axisLine={false} tickLine={false} />
-                  <Tooltip 
-                    cursor={{fill: 'transparent'}}
-                    contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                  <XAxis 
+                    dataKey="name" 
+                    axisLine={false} 
+                    tickLine={false} 
+                    tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
                   />
-                  <Bar dataKey="revenue" fill="#8b5cf6" radius={[4, 4, 0, 0]} barSize={40} />
+                  <YAxis 
+                    axisLine={false} 
+                    tickLine={false} 
+                    tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
+                  />
+                  <Tooltip 
+                    cursor={{fill: 'hsl(var(--muted)/0.2)'}}
+                    contentStyle={{ 
+                      borderRadius: '12px', 
+                      border: '1px solid hsl(var(--border))', 
+                      boxShadow: 'var(--shadow-md)',
+                      backgroundColor: 'hsl(var(--card))',
+                      color: 'hsl(var(--card-foreground))'
+                    }}
+                  />
+                  <Bar dataKey="revenue" fill="hsl(var(--primary))" radius={[6, 6, 0, 0]} barSize={32} />
                 </BarChart>
               </ResponsiveContainer>
             </CardContent>
