@@ -20,7 +20,9 @@ export function useDockets(filters?: { status?: string, search?: string }) {
   return useQuery({
     queryKey: [api.dockets.list.path, filters],
     queryFn: async () => {
-      const res = await fetch(`${api.dockets.list.path}${queryString}`);
+      const res = await fetch(`${api.dockets.list.path}${queryString}`, {
+        credentials: "include",
+      });
       if (!res.ok) throw new Error("Failed to fetch dockets");
       return api.dockets.list.responses[200].parse(await res.json());
     },
@@ -32,9 +34,22 @@ export function useDocket(id: number) {
     queryKey: [api.dockets.get.path, id],
     queryFn: async () => {
       const url = buildUrl(api.dockets.get.path, { id });
-      const res = await fetch(url);
+      const res = await fetch(url, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch docket");
       return api.dockets.get.responses[200].parse(await res.json());
+    },
+    enabled: !!id,
+  });
+}
+
+export function useDocketTracker(id: number) {
+  return useQuery({
+    queryKey: [api.dockets.tracker.path, id],
+    queryFn: async () => {
+      const url = buildUrl(api.dockets.tracker.path, { id });
+      const res = await fetch(url, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch tracker");
+      return api.dockets.tracker.responses[200].parse(await res.json());
     },
     enabled: !!id,
   });
@@ -49,6 +64,7 @@ export function useCreateDocket() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
+        credentials: "include",
       });
       if (!res.ok) throw new Error("Failed to create docket");
       return api.dockets.create.responses[201].parse(await res.json());
@@ -71,7 +87,9 @@ export function useLoadingSheets() {
   return useQuery({
     queryKey: [api.loadingSheets.list.path],
     queryFn: async () => {
-      const res = await fetch(api.loadingSheets.list.path);
+      const res = await fetch(api.loadingSheets.list.path, {
+        credentials: "include",
+      });
       if (!res.ok) throw new Error("Failed to fetch loading sheets");
       return api.loadingSheets.list.responses[200].parse(await res.json());
     },
@@ -87,6 +105,7 @@ export function useCreateLoadingSheet() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
+        credentials: "include",
       });
       if (!res.ok) throw new Error("Failed to create loading sheet");
       return api.loadingSheets.create.responses[201].parse(await res.json());
@@ -108,7 +127,7 @@ export function useFinalizeLoadingSheet() {
   return useMutation({
     mutationFn: async (id: number) => {
       const url = buildUrl(api.loadingSheets.finalize.path, { id });
-      const res = await fetch(url, { method: "POST" });
+      const res = await fetch(url, { method: "POST", credentials: "include" });
       if (!res.ok) throw new Error("Failed to finalize loading sheet");
       return api.loadingSheets.finalize.responses[200].parse(await res.json());
     },
@@ -130,7 +149,9 @@ export function useManifests() {
   return useQuery({
     queryKey: [api.manifests.list.path],
     queryFn: async () => {
-      const res = await fetch(api.manifests.list.path);
+      const res = await fetch(api.manifests.list.path, {
+        credentials: "include",
+      });
       if (!res.ok) throw new Error("Failed to fetch manifests");
       return api.manifests.list.responses[200].parse(await res.json());
     },
@@ -146,6 +167,7 @@ export function useCreateManifest() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
+        credentials: "include",
       });
       if (!res.ok) throw new Error("Failed to create manifest");
       return api.manifests.create.responses[201].parse(await res.json());
@@ -168,7 +190,9 @@ export function useThcs() {
   return useQuery({
     queryKey: [api.thcs.list.path],
     queryFn: async () => {
-      const res = await fetch(api.thcs.list.path);
+      const res = await fetch(api.thcs.list.path, {
+        credentials: "include",
+      });
       if (!res.ok) throw new Error("Failed to fetch THCs");
       return api.thcs.list.responses[200].parse(await res.json());
     },
@@ -184,6 +208,7 @@ export function useCreateThc() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
+        credentials: "include",
       });
       if (!res.ok) throw new Error("Failed to generate THC");
       return api.thcs.create.responses[201].parse(await res.json());
@@ -206,7 +231,9 @@ export function usePods() {
   return useQuery({
     queryKey: [api.pods.list.path],
     queryFn: async () => {
-      const res = await fetch(api.pods.list.path);
+      const res = await fetch(api.pods.list.path, {
+        credentials: "include",
+      });
       if (!res.ok) throw new Error("Failed to fetch PODs");
       return api.pods.list.responses[200].parse(await res.json());
     },
@@ -222,6 +249,7 @@ export function useCreatePod() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
+        credentials: "include",
       });
       if (!res.ok) throw new Error("Failed to upload POD");
       return api.pods.create.responses[201].parse(await res.json());
@@ -244,6 +272,7 @@ export function useUploadPod() {
       const res = await fetch(api.pods.upload.path, {
         method: "POST",
         body: data,
+        credentials: "include",
       });
       if (!res.ok) throw new Error("Failed to upload POD");
       return api.pods.upload.responses[201].parse(await res.json());
@@ -264,7 +293,7 @@ export function useAnalyzePod() {
   return useMutation({
     mutationFn: async (id: number) => {
       const url = buildUrl(api.pods.analyze.path, { id });
-      const res = await fetch(url, { method: "POST" });
+      const res = await fetch(url, { method: "POST", credentials: "include" });
       if (!res.ok) throw new Error("AI Analysis failed");
       return api.pods.analyze.responses[200].parse(await res.json());
     },
@@ -288,6 +317,7 @@ export function useReviewPod() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
+        credentials: "include",
       });
       if (!res.ok) throw new Error("Failed to submit review");
       return api.pods.review.responses[200].parse(await res.json());
@@ -310,7 +340,9 @@ export function useDashboard() {
   return useQuery({
     queryKey: [api.dashboard.get.path],
     queryFn: async () => {
-      const res = await fetch(api.dashboard.get.path);
+      const res = await fetch(api.dashboard.get.path, {
+        credentials: "include",
+      });
       if (!res.ok) throw new Error("Failed to fetch dashboard");
       return api.dashboard.get.responses[200].parse(await res.json());
     },

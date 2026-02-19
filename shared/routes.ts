@@ -44,7 +44,71 @@ const dashboardSchema = z.object({
   weekly: z.array(weeklyPointSchema),
 });
 
+const trackerEventSchema = z.object({
+  key: z.string(),
+  label: z.string(),
+  timestamp: z.string().nullable(),
+  meta: z.record(z.any()).optional(),
+});
+
+const trackerSchema = z.object({
+  docketId: z.number(),
+  docketNumber: z.string(),
+  status: z.string(),
+  events: z.array(trackerEventSchema),
+});
+
+const authUserSchema = z.object({
+  id: z.number(),
+  username: z.string(),
+  role: z.string(),
+});
+
+const loginSchema = z.object({
+  username: z.string().min(3, "Username is required"),
+  password: z.string().min(6, "Password must be at least 6 characters"),
+});
+
+const registerSchema = loginSchema.extend({
+  role: z.enum(["admin", "staff", "driver"]).optional(),
+});
+
 export const api = {
+  auth: {
+    register: {
+      method: "POST" as const,
+      path: "/api/auth/register" as const,
+      input: registerSchema,
+      responses: {
+        201: authUserSchema,
+        400: errorSchemas.validation,
+      },
+    },
+    login: {
+      method: "POST" as const,
+      path: "/api/auth/login" as const,
+      input: loginSchema,
+      responses: {
+        200: authUserSchema,
+        401: errorSchemas.validation,
+      },
+    },
+    me: {
+      method: "GET" as const,
+      path: "/api/auth/me" as const,
+      responses: {
+        200: authUserSchema,
+        401: errorSchemas.validation,
+      },
+    },
+    logout: {
+      method: "POST" as const,
+      path: "/api/auth/logout" as const,
+      responses: {
+        200: z.object({ ok: z.literal(true) }),
+      },
+    },
+  },
   dashboard: {
     get: {
       method: 'GET' as const,
@@ -91,6 +155,14 @@ export const api = {
       input: z.object({ status: z.string() }),
       responses: {
         200: z.custom<typeof dockets.$inferSelect>(),
+        404: errorSchemas.notFound,
+      },
+    },
+    tracker: {
+      method: "GET" as const,
+      path: "/api/dockets/:id/tracker" as const,
+      responses: {
+        200: trackerSchema,
         404: errorSchemas.notFound,
       },
     },

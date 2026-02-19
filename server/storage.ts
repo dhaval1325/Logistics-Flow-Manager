@@ -1,7 +1,9 @@
 
 import { db as dbInstance } from "./db";
 import { 
+  users,
   dockets, docketItems, loadingSheets, loadingSheetDockets, manifests, thcs, pods,
+  type User, type InsertUser,
   type Docket, type InsertDocket, type InsertDocketItem,
   type LoadingSheet, type InsertLoadingSheet,
   type LoadingSheetDocket,
@@ -13,9 +15,20 @@ import {
 import { eq, desc, sql, inArray } from "drizzle-orm";
 
 export interface IStorage {
+  // Users
+  getUserById(id: number): Promise<User | undefined>;
+  getUserByUsername(username: string): Promise<User | undefined>;
+  createUser(user: InsertUser): Promise<User>;
+
   // Dockets
   getDockets(status?: string, search?: string): Promise<(Docket & { items: DocketItem[] })[]>;
   getDocket(id: number): Promise<(Docket & { items: DocketItem[], pod: Pod | null }) | undefined>;
+  getDocketTracker(id: number): Promise<{
+    docketId: number;
+    docketNumber: string;
+    status: string;
+    events: { key: string; label: string; timestamp: string | null; meta?: Record<string, any> }[];
+  } | undefined>;
   createDocket(docket: InsertDocket & { items: InsertDocketItem[] }): Promise<Docket>;
   updateDocketStatus(id: number, status: string): Promise<Docket>;
 
@@ -96,6 +109,22 @@ function buildWeeklyBuckets(reference: Date) {
 export class DatabaseStorage implements IStorage {
   private db = requireDb();
 
+  // Users
+  async getUserById(id: number): Promise<User | undefined> {
+    const [user] = await this.db.select().from(users).where(eq(users.id, id));
+    return user;
+  }
+
+  async getUserByUsername(username: string): Promise<User | undefined> {
+    const [user] = await this.db.select().from(users).where(eq(users.username, username));
+    return user;
+  }
+
+  async createUser(userData: InsertUser): Promise<User> {
+    const [user] = await this.db.insert(users).values(userData).returning();
+    return user;
+  }
+
   // Dockets
   async getDockets(status?: string, search?: string): Promise<(Docket & { items: DocketItem[] })[]> {
     let query = this.db.select().from(dockets);
@@ -133,6 +162,96 @@ export class DatabaseStorage implements IStorage {
     const [pod] = await this.db.select().from(pods).where(eq(pods.docketId, id));
 
     return { ...docket, items, pod: pod || null };
+  }
+
+  async getDocketTracker(id: number) {
+    const [docket] = await this.db.select().from(dockets).where(eq(dockets.id, id));
+    if (!docket) return undefined;
+
+    const links = await this.db
+      .select()
+      .from(loadingSheetDockets)
+      .where(eq(loadingSheetDockets.docketId, id));
+    const loadingSheetIds = links.map((link) => link.loadingSheetId);
+    const loadingSheetRows = loadingSheetIds.length
+      ? await this.db.select().from(loadingSheets).where(inArray(loadingSheets.id, loadingSheetIds))
+      : [];
+
+    const manifestRows = loadingSheetRows.length
+      ? await this.db
+          .select()
+          .from(manifests)
+          .where(inArray(manifests.loadingSheetId, loadingSheetRows.map((sheet) => sheet.id)))
+      : [];
+
+    const thcRows = manifestRows.length
+      ? await this.db
+          .select()
+          .from(thcs)
+          .where(inArray(thcs.manifestId, manifestRows.map((manifest) => manifest.id)))
+      : [];
+
+    const [pod] = await this.db.select().from(pods).where(eq(pods.docketId, id));
+
+    const events = [
+      {
+        key: "docket_created",
+        label: "Docket created",
+        timestamp: docket.createdAt ? docket.createdAt.toISOString() : null,
+        meta: {
+          status: docket.status,
+        },
+      },
+      {
+        key: "loading_sheet_created",
+        label: "Loading sheet created",
+        timestamp: loadingSheetRows[0]?.createdAt
+          ? loadingSheetRows[0].createdAt.toISOString()
+          : null,
+        meta: {
+          count: loadingSheetRows.length,
+          sheetNumbers: loadingSheetRows.map((sheet) => sheet.sheetNumber),
+        },
+      },
+      {
+        key: "manifest_created",
+        label: "Manifest created",
+        timestamp: manifestRows[0]?.generatedAt
+          ? manifestRows[0].generatedAt.toISOString()
+          : null,
+        meta: {
+          count: manifestRows.length,
+          manifestNumbers: manifestRows.map((manifest) => manifest.manifestNumber),
+        },
+      },
+      {
+        key: "thc_created",
+        label: "THC created",
+        timestamp: thcRows[0]?.createdAt ? thcRows[0].createdAt.toISOString() : null,
+        meta: {
+          count: thcRows.length,
+          thcNumbers: thcRows.map((thc) => thc.thcNumber),
+        },
+      },
+      {
+        key: "pod_uploaded",
+        label: "POD uploaded",
+        timestamp: pod?.createdAt ? pod.createdAt.toISOString() : null,
+        meta: pod
+          ? {
+              status: pod.status,
+              imageUrl: pod.imageUrl,
+            }
+          : undefined,
+      },
+    ];
+
+    return {
+      docketId: docket.id,
+      docketNumber: docket.docketNumber,
+      status: docket.status,
+      events,
+    };
   }
 
   async createDocket(docketData: InsertDocket & { items: InsertDocketItem[] }): Promise<Docket> {
@@ -377,6 +496,7 @@ export class DatabaseStorage implements IStorage {
 }
 
 class MemoryStorage implements IStorage {
+  private users: User[] = [];
   private dockets: Docket[] = [];
   private docketItems: DocketItem[] = [];
   private loadingSheets: LoadingSheet[] = [];
@@ -385,6 +505,7 @@ class MemoryStorage implements IStorage {
   private thcs: Thc[] = [];
   private pods: Pod[] = [];
   private counters = {
+    user: 1,
     docket: 1,
     docketItem: 1,
     loadingSheet: 1,
@@ -398,6 +519,26 @@ class MemoryStorage implements IStorage {
     const value = this.counters[key];
     this.counters[key] += 1;
     return value;
+  }
+
+  async getUserById(id: number): Promise<User | undefined> {
+    return this.users.find((user) => user.id === id);
+  }
+
+  async getUserByUsername(username: string): Promise<User | undefined> {
+    return this.users.find((user) => user.username === username);
+  }
+
+  async createUser(userData: InsertUser): Promise<User> {
+    const user: User = {
+      id: this.nextId("user"),
+      username: userData.username,
+      password: userData.password,
+      role: userData.role ?? "staff",
+      createdAt: new Date(),
+    };
+    this.users.push(user);
+    return user;
   }
 
   async getDockets(status?: string, search?: string): Promise<(Docket & { items: DocketItem[] })[]> {
@@ -431,6 +572,79 @@ class MemoryStorage implements IStorage {
     const pod = this.pods.find((p) => p.docketId === id) ?? null;
 
     return { ...docket, items, pod };
+  }
+
+  async getDocketTracker(id: number) {
+    const docket = this.dockets.find((d) => d.id === id);
+    if (!docket) return undefined;
+
+    const links = this.loadingSheetDockets.filter((link) => link.docketId === id);
+    const loadingSheetRows = this.loadingSheets.filter((sheet) =>
+      links.some((link) => link.loadingSheetId === sheet.id),
+    );
+    const manifestRows = this.manifests.filter((manifest) =>
+      loadingSheetRows.some((sheet) => sheet.id === manifest.loadingSheetId),
+    );
+    const thcRows = this.thcs.filter((thc) =>
+      manifestRows.some((manifest) => manifest.id === thc.manifestId),
+    );
+    const pod = this.pods.find((p) => p.docketId === id);
+
+    const events = [
+      {
+        key: "docket_created",
+        label: "Docket created",
+        timestamp: docket.createdAt ? docket.createdAt.toISOString() : null,
+        meta: { status: docket.status },
+      },
+      {
+        key: "loading_sheet_created",
+        label: "Loading sheet created",
+        timestamp: loadingSheetRows[0]?.createdAt
+          ? loadingSheetRows[0].createdAt.toISOString()
+          : null,
+        meta: {
+          count: loadingSheetRows.length,
+          sheetNumbers: loadingSheetRows.map((sheet) => sheet.sheetNumber),
+        },
+      },
+      {
+        key: "manifest_created",
+        label: "Manifest created",
+        timestamp: manifestRows[0]?.generatedAt ? manifestRows[0].generatedAt.toISOString() : null,
+        meta: {
+          count: manifestRows.length,
+          manifestNumbers: manifestRows.map((manifest) => manifest.manifestNumber),
+        },
+      },
+      {
+        key: "thc_created",
+        label: "THC created",
+        timestamp: thcRows[0]?.createdAt ? thcRows[0].createdAt.toISOString() : null,
+        meta: {
+          count: thcRows.length,
+          thcNumbers: thcRows.map((thc) => thc.thcNumber),
+        },
+      },
+      {
+        key: "pod_uploaded",
+        label: "POD uploaded",
+        timestamp: pod?.createdAt ? pod.createdAt.toISOString() : null,
+        meta: pod
+          ? {
+              status: pod.status,
+              imageUrl: pod.imageUrl,
+            }
+          : undefined,
+      },
+    ];
+
+    return {
+      docketId: docket.id,
+      docketNumber: docket.docketNumber,
+      status: docket.status,
+      events,
+    };
   }
 
   async createDocket(docketData: InsertDocket & { items: InsertDocketItem[] }): Promise<Docket> {
