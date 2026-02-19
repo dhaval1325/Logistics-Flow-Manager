@@ -162,7 +162,7 @@ export const api = {
       method: 'GET' as const,
       path: '/api/dockets/:id' as const,
       responses: {
-        200: z.custom<typeof dockets.$inferSelect & { items: typeof docketItems.$inferSelect[], pod: typeof pods.$inferSelect | null }>(),
+        200: z.custom<typeof dockets.$inferSelect & { items: typeof docketItems.$inferSelect[], pod: typeof pods.$inferSelect | null; loadingSheets: (typeof loadingSheets.$inferSelect)[]; manifests: (typeof manifests.$inferSelect)[]; thcs: (typeof thcs.$inferSelect)[] }>(),
         404: errorSchemas.notFound,
       },
     },
@@ -226,7 +226,7 @@ export const api = {
       method: 'GET' as const,
       path: '/api/loading-sheets/:id' as const,
       responses: {
-        200: z.custom<typeof loadingSheets.$inferSelect & { dockets: (typeof dockets.$inferSelect)[] }>(),
+        200: z.custom<typeof loadingSheets.$inferSelect & { dockets: (typeof dockets.$inferSelect)[]; manifests: (typeof manifests.$inferSelect)[]; thcs: (typeof thcs.$inferSelect)[] }>(),
         404: errorSchemas.notFound,
       },
     },
@@ -252,7 +252,7 @@ export const api = {
       method: 'GET' as const,
       path: '/api/manifests/:id' as const,
       responses: {
-        200: z.custom<typeof manifests.$inferSelect & { loadingSheet: typeof loadingSheets.$inferSelect }>(),
+        200: z.custom<typeof manifests.$inferSelect & { loadingSheet: typeof loadingSheets.$inferSelect; dockets: (typeof dockets.$inferSelect)[]; thc: typeof thcs.$inferSelect | null }>(),
         404: errorSchemas.notFound,
       },
     },
@@ -272,6 +272,14 @@ export const api = {
       path: '/api/thcs' as const,
       responses: {
         200: z.array(z.custom<typeof thcs.$inferSelect>()),
+      },
+    },
+    get: {
+      method: 'GET' as const,
+      path: '/api/thcs/:id' as const,
+      responses: {
+        200: z.custom<typeof thcs.$inferSelect & { manifest: typeof manifests.$inferSelect | null; loadingSheet: typeof loadingSheets.$inferSelect | null; dockets: (typeof dockets.$inferSelect)[] }>(),
+        404: errorSchemas.notFound,
       },
     },
     update: {

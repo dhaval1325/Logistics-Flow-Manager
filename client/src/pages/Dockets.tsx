@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { useDockets, useCreateDocket } from "@/hooks/use-logistics";
+import { useDockets, useCreateDocket, useDocket } from "@/hooks/use-logistics";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { 
@@ -27,6 +27,7 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { Card, CardContent } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { openPrintWindow } from "@/lib/print";
+import type { LoadingSheet, Manifest, Pod, Thc } from "@shared/schema";
 
 const itemSchema = insertDocketItemSchema.extend({
   weight: z.coerce.number(),
@@ -73,10 +74,16 @@ export default function Dockets() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedId, setSelectedId] = useState<number | null>(null);
 
+  const selectedQuery = useDocket(selectedId ?? 0);
   const selected = useMemo(
     () => dockets?.find((docket) => docket.id === selectedId) ?? null,
     [dockets, selectedId],
   );
+  const details = selectedQuery.data ?? null;
+  const loadingSheets: LoadingSheet[] = details?.loadingSheets ?? [];
+  const manifests: Manifest[] = details?.manifests ?? [];
+  const thcs: Thc[] = details?.thcs ?? [];
+  const pod: Pod | null = details?.pod ?? null;
 
   return (
     <div className="space-y-6">
@@ -237,6 +244,65 @@ export default function Dockets() {
                   </div>
                 </div>
 
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <div className="rounded-lg border border-border p-3">
+                    <div className="text-xs uppercase text-muted-foreground">Loading Sheets</div>
+                    {loadingSheets.length ? (
+                      <ul className="mt-2 space-y-1 text-xs text-muted-foreground">
+                        {loadingSheets.map((sheet) => (
+                          <li key={sheet.id}>
+                            <span className="font-semibold text-foreground">{sheet.sheetNumber}</span> •{" "}
+                            {sheet.vehicleNumber} • {sheet.status}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <div className="mt-2 text-xs text-muted-foreground">Not linked yet</div>
+                    )}
+                  </div>
+                  <div className="rounded-lg border border-border p-3">
+                    <div className="text-xs uppercase text-muted-foreground">Manifests</div>
+                    {manifests.length ? (
+                      <ul className="mt-2 space-y-1 text-xs text-muted-foreground">
+                        {manifests.map((manifest) => (
+                          <li key={manifest.id}>
+                            <span className="font-semibold text-foreground">{manifest.manifestNumber}</span> •{" "}
+                            {manifest.status}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <div className="mt-2 text-xs text-muted-foreground">Not generated</div>
+                    )}
+                  </div>
+                  <div className="rounded-lg border border-border p-3">
+                    <div className="text-xs uppercase text-muted-foreground">THCs</div>
+                    {thcs.length ? (
+                      <ul className="mt-2 space-y-1 text-xs text-muted-foreground">
+                        {thcs.map((thc) => (
+                          <li key={thc.id}>
+                            <span className="font-semibold text-foreground">{thc.thcNumber}</span> •{" "}
+                            {thc.status}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <div className="mt-2 text-xs text-muted-foreground">Not created</div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="rounded-lg border border-border p-3">
+                  <div className="text-xs uppercase text-muted-foreground">POD</div>
+                  {pod ? (
+                    <div className="mt-2 text-xs text-muted-foreground">
+                      Status: <span className="text-foreground font-semibold">{pod.status}</span>
+                    </div>
+                  ) : (
+                    <div className="mt-2 text-xs text-muted-foreground">No POD uploaded</div>
+                  )}
+                </div>
+
                 <div className="flex justify-end">
                   <Button
                     variant="outline"
@@ -245,6 +311,24 @@ export default function Dockets() {
                         .map(
                           (item) =>
                             `<tr><td>${item.description}</td><td>${item.packageType}</td><td>${item.weight}</td><td>${item.quantity}</td></tr>`,
+                        )
+                        .join("");
+                      const loadingSheetRows = loadingSheets
+                        .map(
+                          (sheet) =>
+                            `<tr><td>${sheet.sheetNumber}</td><td>${sheet.vehicleNumber}</td><td>${sheet.status}</td></tr>`,
+                        )
+                        .join("");
+                      const manifestRows = manifests
+                        .map(
+                          (manifest) =>
+                            `<tr><td>${manifest.manifestNumber}</td><td>${manifest.status}</td></tr>`,
+                        )
+                        .join("");
+                      const thcRows = thcs
+                        .map(
+                          (thc) =>
+                            `<tr><td>${thc.thcNumber}</td><td>${thc.status}</td><td>${thc.hireAmount ?? ""}</td></tr>`,
                         )
                         .join("");
                       const bodyHtml = `
@@ -262,6 +346,31 @@ export default function Dockets() {
                             <thead><tr><th>Description</th><th>Type</th><th>Weight</th><th>Qty</th></tr></thead>
                             <tbody>${itemsRows || "<tr><td colspan='4'>No items</td></tr>"}</tbody>
                           </table>
+                        </div>
+                        <div class="section">
+                          <h2>Loading Sheets</h2>
+                          <table>
+                            <thead><tr><th>Sheet #</th><th>Vehicle</th><th>Status</th></tr></thead>
+                            <tbody>${loadingSheetRows || "<tr><td colspan='3'>Not linked</td></tr>"}</tbody>
+                          </table>
+                        </div>
+                        <div class="section">
+                          <h2>Manifests</h2>
+                          <table>
+                            <thead><tr><th>Manifest #</th><th>Status</th></tr></thead>
+                            <tbody>${manifestRows || "<tr><td colspan='2'>Not generated</td></tr>"}</tbody>
+                          </table>
+                        </div>
+                        <div class="section">
+                          <h2>THCs</h2>
+                          <table>
+                            <thead><tr><th>THC #</th><th>Status</th><th>Hire Amt</th></tr></thead>
+                            <tbody>${thcRows || "<tr><td colspan='3'>Not created</td></tr>"}</tbody>
+                          </table>
+                        </div>
+                        <div class="section">
+                          <h2>POD</h2>
+                          <div class="meta">${pod ? `Status: ${pod.status}` : "No POD uploaded"}</div>
                         </div>
                       `;
                       openPrintWindow(`Docket ${selected.docketNumber}`, bodyHtml);

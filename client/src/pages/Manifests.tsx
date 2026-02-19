@@ -128,10 +128,62 @@ export default function Manifests() {
                   </div>
                 )}
 
+                <div>
+                  <div className="text-xs uppercase text-muted-foreground">Dockets</div>
+                  <div className="mt-2 rounded-lg border border-border overflow-hidden">
+                    <Table>
+                      <TableHeader className="bg-muted/50">
+                        <TableRow>
+                          <TableHead>Docket #</TableHead>
+                          <TableHead>Sender</TableHead>
+                          <TableHead>Receiver</TableHead>
+                          <TableHead>Status</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {selected.dockets?.length ? (
+                          selected.dockets.map((docket) => (
+                            <TableRow key={docket.id}>
+                              <TableCell className="font-mono">{docket.docketNumber}</TableCell>
+                              <TableCell>{docket.senderName}</TableCell>
+                              <TableCell>{docket.receiverName}</TableCell>
+                              <TableCell className="capitalize">{docket.status}</TableCell>
+                            </TableRow>
+                          ))
+                        ) : (
+                          <TableRow>
+                            <TableCell colSpan={4} className="text-center text-muted-foreground">
+                              No dockets
+                            </TableCell>
+                          </TableRow>
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
+
+                <div className="rounded-lg border border-border p-3 text-sm">
+                  <div className="text-xs uppercase text-muted-foreground">THC</div>
+                  {selected.thc ? (
+                    <div className="mt-2 text-xs text-muted-foreground">
+                      <span className="font-semibold text-foreground">{selected.thc.thcNumber}</span> •{" "}
+                      {selected.thc.status}
+                    </div>
+                  ) : (
+                    <div className="mt-2 text-xs text-muted-foreground">No THC linked</div>
+                  )}
+                </div>
+
                 <div className="flex justify-end">
                   <Button
                     variant="outline"
                     onClick={() => {
+                      const docketRows = (selected.dockets ?? [])
+                        .map(
+                          (d) =>
+                            `<tr><td>${d.docketNumber}</td><td>${d.senderName}</td><td>${d.receiverName}</td><td>${d.status}</td></tr>`,
+                        )
+                        .join("");
                       const bodyHtml = `
                         <div class="grid">
                           <div><div class="meta">Manifest #</div><div>${selected.manifestNumber}</div></div>
@@ -144,6 +196,17 @@ export default function Manifests() {
                             ? `<div class="section"><h2>Loading Sheet</h2><div class="meta">Vehicle: ${selected.loadingSheet.vehicleNumber} | Driver: ${selected.loadingSheet.driverName} | Destination: ${selected.loadingSheet.destination}</div></div>`
                             : ""
                         }
+                        <div class="section">
+                          <h2>Dockets</h2>
+                          <table>
+                            <thead><tr><th>Docket #</th><th>Sender</th><th>Receiver</th><th>Status</th></tr></thead>
+                            <tbody>${docketRows || "<tr><td colspan='4'>No dockets</td></tr>"}</tbody>
+                          </table>
+                        </div>
+                        <div class="section">
+                          <h2>THC</h2>
+                          <div class="meta">${selected.thc ? `${selected.thc.thcNumber} • ${selected.thc.status}` : "No THC linked"}</div>
+                        </div>
                       `;
                       openPrintWindow(`Manifest ${selected.manifestNumber}`, bodyHtml);
                     }}

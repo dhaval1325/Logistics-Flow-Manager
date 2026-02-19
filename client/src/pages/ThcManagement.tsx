@@ -1,4 +1,5 @@
-import { useThcs, useCreateThc, useManifests } from "@/hooks/use-logistics";
+import { useThcs, useCreateThc, useManifests, useThc } from "@/hooks/use-logistics";
+import type { Docket, LoadingSheet, Manifest } from "@shared/schema";
 import { Button } from "@/components/ui/button";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
 import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -19,10 +20,15 @@ export default function ThcManagement() {
   const { data: thcs, isLoading } = useThcs();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedId, setSelectedId] = useState<number | null>(null);
+  const selectedQuery = useThc(selectedId ?? 0);
   const selected = useMemo(
     () => thcs?.find((thc) => thc.id === selectedId) ?? null,
     [thcs, selectedId],
   );
+  const details = selectedQuery.data ?? null;
+  const manifest: Manifest | null = details?.manifest ?? null;
+  const loadingSheet: LoadingSheet | null = details?.loadingSheet ?? null;
+  const dockets: Docket[] = details?.dockets ?? [];
 
   return (
     <div className="space-y-6">
@@ -141,10 +147,75 @@ export default function ThcManagement() {
                   </div>
                 </div>
 
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div className="rounded-lg border border-border p-3">
+                    <div className="text-xs uppercase text-muted-foreground">Manifest</div>
+                    {manifest ? (
+                      <div className="mt-2 text-xs text-muted-foreground">
+                        <span className="font-semibold text-foreground">{manifest.manifestNumber}</span> •{" "}
+                        {manifest.status}
+                      </div>
+                    ) : (
+                      <div className="mt-2 text-xs text-muted-foreground">No manifest linked</div>
+                    )}
+                  </div>
+                  <div className="rounded-lg border border-border p-3">
+                    <div className="text-xs uppercase text-muted-foreground">Loading Sheet</div>
+                    {loadingSheet ? (
+                      <div className="mt-2 text-xs text-muted-foreground">
+                        <span className="font-semibold text-foreground">{loadingSheet.sheetNumber}</span> •{" "}
+                        {loadingSheet.vehicleNumber}
+                      </div>
+                    ) : (
+                      <div className="mt-2 text-xs text-muted-foreground">No loading sheet linked</div>
+                    )}
+                  </div>
+                </div>
+
+                <div>
+                  <div className="text-xs uppercase text-muted-foreground">Dockets</div>
+                  <div className="mt-2 rounded-lg border border-border overflow-hidden">
+                    <Table>
+                      <TableHeader className="bg-muted/50">
+                        <TableRow>
+                          <TableHead>Docket #</TableHead>
+                          <TableHead>Sender</TableHead>
+                          <TableHead>Receiver</TableHead>
+                          <TableHead>Status</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {dockets.length ? (
+                          dockets.map((docket) => (
+                            <TableRow key={docket.id}>
+                              <TableCell className="font-mono">{docket.docketNumber}</TableCell>
+                              <TableCell>{docket.senderName}</TableCell>
+                              <TableCell>{docket.receiverName}</TableCell>
+                              <TableCell className="capitalize">{docket.status}</TableCell>
+                            </TableRow>
+                          ))
+                        ) : (
+                          <TableRow>
+                            <TableCell colSpan={4} className="text-center text-muted-foreground">
+                              No dockets linked
+                            </TableCell>
+                          </TableRow>
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
+
                 <div className="flex justify-end">
                   <Button
                     variant="outline"
                     onClick={() => {
+                      const docketRows = dockets
+                        .map(
+                          (d) =>
+                            `<tr><td>${d.docketNumber}</td><td>${d.senderName}</td><td>${d.receiverName}</td><td>${d.status}</td></tr>`,
+                        )
+                        .join("");
                       const bodyHtml = `
                         <div class="grid">
                           <div><div class="meta">THC #</div><div>${selected.thcNumber}</div></div>
@@ -161,6 +232,21 @@ export default function ThcManagement() {
                               <tr><th>Advance</th><td>$${Number(selected.advanceAmount).toFixed(2)}</td></tr>
                               <tr><th>Balance</th><td>$${Number(selected.balanceAmount).toFixed(2)}</td></tr>
                             </tbody>
+                          </table>
+                        </div>
+                        <div class="section">
+                          <h2>Manifest</h2>
+                          <div class="meta">${manifest ? `${manifest.manifestNumber} • ${manifest.status}` : "No manifest linked"}</div>
+                        </div>
+                        <div class="section">
+                          <h2>Loading Sheet</h2>
+                          <div class="meta">${loadingSheet ? `${loadingSheet.sheetNumber} • ${loadingSheet.vehicleNumber}` : "No loading sheet linked"}</div>
+                        </div>
+                        <div class="section">
+                          <h2>Dockets</h2>
+                          <table>
+                            <thead><tr><th>Docket #</th><th>Sender</th><th>Receiver</th><th>Status</th></tr></thead>
+                            <tbody>${docketRows || "<tr><td colspan='4'>No dockets linked</td></tr>"}</tbody>
                           </table>
                         </div>
                       `;

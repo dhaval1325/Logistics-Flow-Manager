@@ -4,6 +4,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Sidebar } from "@/components/Sidebar";
+import { Topbar } from "@/components/Topbar";
 import Dashboard from "@/pages/Dashboard";
 import Dockets from "@/pages/Dockets";
 import LoadingSheets from "@/pages/LoadingSheets";
@@ -16,10 +17,12 @@ import NotFound from "@/pages/not-found";
 
 function Router() {
   return (
-    <div className="min-h-screen bg-background flex">
-      <Sidebar />
-      <main className="flex-1 lg:ml-[var(--sidebar-width)] p-6 lg:p-8 overflow-y-auto h-screen">
-        <div className="max-w-7xl mx-auto pb-10">
+    <div className="min-h-screen bg-background">
+      <Topbar />
+      <div className="flex pt-[var(--topbar-height)]">
+        <Sidebar />
+        <main className="flex-1 lg:ml-[var(--sidebar-width)] p-6 lg:p-8 overflow-y-auto h-[calc(100vh-var(--topbar-height))]">
+          <div className="max-w-7xl mx-auto pb-10">
           <Switch>
             <Route path="/" component={Dashboard} />
             <Route path="/dockets" component={Dockets} />
@@ -32,7 +35,8 @@ function Router() {
             <Route component={NotFound} />
           </Switch>
         </div>
-      </main>
+        </main>
+      </div>
     </div>
   );
 }

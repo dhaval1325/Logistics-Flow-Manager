@@ -24,7 +24,18 @@ export interface IStorage {
 
   // Dockets
   getDockets(status?: string, search?: string): Promise<(Docket & { items: DocketItem[] })[]>;
-  getDocket(id: number): Promise<(Docket & { items: DocketItem[], pod: Pod | null }) | undefined>;
+  getDocket(
+    id: number,
+  ): Promise<
+    | (Docket & {
+        items: DocketItem[];
+        pod: Pod | null;
+        loadingSheets: LoadingSheet[];
+        manifests: Manifest[];
+        thcs: Thc[];
+      })
+    | undefined
+  >;
   getDocketTracker(id: number): Promise<{
     docketId: number;
     docketNumber: string;
@@ -36,17 +47,29 @@ export interface IStorage {
 
   // Loading Sheets
   getLoadingSheets(): Promise<LoadingSheet[]>;
-  getLoadingSheet(id: number): Promise<(LoadingSheet & { dockets: Docket[] }) | undefined>;
+  getLoadingSheet(
+    id: number,
+  ): Promise<(LoadingSheet & { dockets: Docket[]; manifests: Manifest[]; thcs: Thc[] }) | undefined>;
   createLoadingSheet(sheet: InsertLoadingSheet & { docketIds: number[] }): Promise<LoadingSheet>;
   finalizeLoadingSheet(id: number): Promise<LoadingSheet>;
 
   // Manifests
   getManifests(): Promise<Manifest[]>;
-  getManifest(id: number): Promise<(Manifest & { loadingSheet: LoadingSheet }) | undefined>;
+  getManifest(
+    id: number,
+  ): Promise<(Manifest & { loadingSheet: LoadingSheet; dockets: Docket[]; thc: Thc | null }) | undefined>;
   createManifest(manifest: CreateManifestRequest): Promise<Manifest>;
 
   // THCs
   getThcs(): Promise<Thc[]>;
+  getThc(id: number): Promise<
+    | (Thc & {
+        manifest: Manifest | null;
+        loadingSheet: LoadingSheet | null;
+        dockets: Docket[];
+      })
+    | undefined
+  >;
   createThc(thc: InsertThc): Promise<Thc>;
   updateThc(id: number, updates: Partial<InsertThc>): Promise<Thc>;
 
@@ -168,14 +191,47 @@ export class DatabaseStorage implements IStorage {
     });
   }
 
-  async getDocket(id: number): Promise<(Docket & { items: DocketItem[], pod: Pod | null }) | undefined> {
+  async getDocket(
+    id: number,
+  ): Promise<
+    | (Docket & {
+        items: DocketItem[];
+        pod: Pod | null;
+        loadingSheets: LoadingSheet[];
+        manifests: Manifest[];
+        thcs: Thc[];
+      })
+    | undefined
+  > {
     const [docket] = await this.db.select().from(dockets).where(eq(dockets.id, id));
     if (!docket) return undefined;
 
     const items = await this.db.select().from(docketItems).where(eq(docketItems.docketId, id));
     const [pod] = await this.db.select().from(pods).where(eq(pods.docketId, id));
+    const links = await this.db.select().from(loadingSheetDockets).where(eq(loadingSheetDockets.docketId, id));
+    const loadingSheetIds = links.map((link) => link.loadingSheetId);
+    const loadingSheetsList =
+      loadingSheetIds.length > 0
+        ? await this.db.select().from(loadingSheets).where(inArray(loadingSheets.id, loadingSheetIds))
+        : [];
+    const manifestsList =
+      loadingSheetIds.length > 0
+        ? await this.db.select().from(manifests).where(inArray(manifests.loadingSheetId, loadingSheetIds))
+        : [];
+    const manifestIds = manifestsList.map((manifest) => manifest.id);
+    const thcsList =
+      manifestIds.length > 0
+        ? await this.db.select().from(thcs).where(inArray(thcs.manifestId, manifestIds))
+        : [];
 
-    return { ...docket, items, pod: pod || null };
+    return {
+      ...docket,
+      items,
+      pod: pod || null,
+      loadingSheets: loadingSheetsList,
+      manifests: manifestsList,
+      thcs: thcsList,
+    };
   }
 
   async getDocketTracker(id: number) {
@@ -322,7 +378,9 @@ export class DatabaseStorage implements IStorage {
     return await this.db.select().from(loadingSheets).orderBy(desc(loadingSheets.createdAt));
   }
 
-  async getLoadingSheet(id: number): Promise<(LoadingSheet & { dockets: Docket[] }) | undefined> {
+  async getLoadingSheet(
+    id: number,
+  ): Promise<(LoadingSheet & { dockets: Docket[]; manifests: Manifest[]; thcs: Thc[] }) | undefined> {
     const [sheet] = await this.db.select().from(loadingSheets).where(eq(loadingSheets.id, id));
     if (!sheet) return undefined;
 
@@ -335,7 +393,14 @@ export class DatabaseStorage implements IStorage {
       linkedDockets = await this.db.select().from(dockets).where(inArray(dockets.id, docketIds));
     }
 
-    return { ...sheet, dockets: linkedDockets };
+    const sheetManifests = await this.db.select().from(manifests).where(eq(manifests.loadingSheetId, id));
+    const manifestIds = sheetManifests.map((manifest) => manifest.id);
+    const sheetThcs =
+      manifestIds.length > 0
+        ? await this.db.select().from(thcs).where(inArray(thcs.manifestId, manifestIds))
+        : [];
+
+    return { ...sheet, dockets: linkedDockets, manifests: sheetManifests, thcs: sheetThcs };
   }
 
   async createLoadingSheet(sheetData: InsertLoadingSheet & { docketIds: number[] }): Promise<LoadingSheet> {
@@ -376,13 +441,20 @@ export class DatabaseStorage implements IStorage {
     return await this.db.select().from(manifests).orderBy(desc(manifests.generatedAt));
   }
 
-  async getManifest(id: number): Promise<(Manifest & { loadingSheet: LoadingSheet }) | undefined> {
+  async getManifest(
+    id: number,
+  ): Promise<(Manifest & { loadingSheet: LoadingSheet; dockets: Docket[]; thc: Thc | null }) | undefined> {
     const [manifest] = await this.db.select().from(manifests).where(eq(manifests.id, id));
     if (!manifest) return undefined;
 
     const [sheet] = await this.db.select().from(loadingSheets).where(eq(loadingSheets.id, manifest.loadingSheetId));
-    
-    return { ...manifest, loadingSheet: sheet };
+    const links = await this.db.select().from(loadingSheetDockets).where(eq(loadingSheetDockets.loadingSheetId, manifest.loadingSheetId));
+    const docketIds = links.map((l) => l.docketId);
+    const linkedDockets =
+      docketIds.length > 0 ? await this.db.select().from(dockets).where(inArray(dockets.id, docketIds)) : [];
+    const [thc] = await this.db.select().from(thcs).where(eq(thcs.manifestId, manifest.id));
+
+    return { ...manifest, loadingSheet: sheet, dockets: linkedDockets, thc: thc || null };
   }
 
   async createManifest(manifestData: CreateManifestRequest): Promise<Manifest> {
@@ -414,6 +486,31 @@ export class DatabaseStorage implements IStorage {
   // THCs
   async getThcs(): Promise<Thc[]> {
     return await this.db.select().from(thcs).orderBy(desc(thcs.createdAt));
+  }
+
+  async getThc(
+    id: number,
+  ): Promise<
+    | (Thc & { manifest: Manifest | null; loadingSheet: LoadingSheet | null; dockets: Docket[] })
+    | undefined
+  > {
+    const [thc] = await this.db.select().from(thcs).where(eq(thcs.id, id));
+    if (!thc) return undefined;
+    const [manifest] = await this.db.select().from(manifests).where(eq(manifests.id, thc.manifestId));
+    const [sheet] = manifest
+      ? await this.db.select().from(loadingSheets).where(eq(loadingSheets.id, manifest.loadingSheetId))
+      : [];
+    const links = manifest
+      ? await this.db
+          .select()
+          .from(loadingSheetDockets)
+          .where(eq(loadingSheetDockets.loadingSheetId, manifest.loadingSheetId))
+      : [];
+    const docketIds = links.map((l) => l.docketId);
+    const linkedDockets =
+      docketIds.length > 0 ? await this.db.select().from(dockets).where(inArray(dockets.id, docketIds)) : [];
+
+    return { ...thc, manifest: manifest || null, loadingSheet: sheet || null, dockets: linkedDockets };
   }
 
   async createThc(thcData: InsertThc): Promise<Thc> {
@@ -648,14 +745,43 @@ class MemoryStorage implements IStorage {
     });
   }
 
-  async getDocket(id: number): Promise<(Docket & { items: DocketItem[], pod: Pod | null }) | undefined> {
+  async getDocket(
+    id: number,
+  ): Promise<
+    | (Docket & {
+        items: DocketItem[];
+        pod: Pod | null;
+        loadingSheets: LoadingSheet[];
+        manifests: Manifest[];
+        thcs: Thc[];
+      })
+    | undefined
+  > {
     const docket = this.dockets.find((d) => d.id === id);
     if (!docket) return undefined;
 
     const items = this.docketItems.filter((item) => item.docketId === id);
     const pod = this.pods.find((p) => p.docketId === id) ?? null;
 
-    return { ...docket, items, pod };
+    const links = this.loadingSheetDockets.filter((link) => link.docketId === id);
+    const loadingSheetRows = this.loadingSheets.filter((sheet) =>
+      links.some((link) => link.loadingSheetId === sheet.id),
+    );
+    const manifestRows = this.manifests.filter((manifest) =>
+      loadingSheetRows.some((sheet) => sheet.id === manifest.loadingSheetId),
+    );
+    const thcRows = this.thcs.filter((thc) =>
+      manifestRows.some((manifest) => manifest.id === thc.manifestId),
+    );
+
+    return {
+      ...docket,
+      items,
+      pod,
+      loadingSheets: loadingSheetRows,
+      manifests: manifestRows,
+      thcs: thcRows,
+    };
   }
 
   async getDocketTracker(id: number) {
@@ -815,7 +941,9 @@ class MemoryStorage implements IStorage {
     );
   }
 
-  async getLoadingSheet(id: number): Promise<(LoadingSheet & { dockets: Docket[] }) | undefined> {
+  async getLoadingSheet(
+    id: number,
+  ): Promise<(LoadingSheet & { dockets: Docket[]; manifests: Manifest[]; thcs: Thc[] }) | undefined> {
     const sheet = this.loadingSheets.find((s) => s.id === id);
     if (!sheet) return undefined;
 
@@ -824,7 +952,12 @@ class MemoryStorage implements IStorage {
       .map((link) => link.docketId);
     const dockets = this.dockets.filter((d) => docketIds.includes(d.id));
 
-    return { ...sheet, dockets };
+    const manifests = this.manifests.filter((manifest) => manifest.loadingSheetId === id);
+    const thcs = this.thcs.filter((thc) =>
+      manifests.some((manifest) => manifest.id === thc.manifestId),
+    );
+
+    return { ...sheet, dockets, manifests, thcs };
   }
 
   async createLoadingSheet(sheetData: InsertLoadingSheet & { docketIds: number[] }): Promise<LoadingSheet> {
@@ -878,14 +1011,22 @@ class MemoryStorage implements IStorage {
     );
   }
 
-  async getManifest(id: number): Promise<(Manifest & { loadingSheet: LoadingSheet }) | undefined> {
+  async getManifest(
+    id: number,
+  ): Promise<(Manifest & { loadingSheet: LoadingSheet; dockets: Docket[]; thc: Thc | null }) | undefined> {
     const manifest = this.manifests.find((m) => m.id === id);
     if (!manifest) return undefined;
 
     const sheet = this.loadingSheets.find((s) => s.id === manifest.loadingSheetId);
     if (!sheet) return undefined;
 
-    return { ...manifest, loadingSheet: sheet };
+    const docketLinks = this.loadingSheetDockets.filter(
+      (link) => link.loadingSheetId === manifest.loadingSheetId,
+    );
+    const dockets = this.dockets.filter((d) => docketLinks.some((link) => link.docketId === d.id));
+    const thc = this.thcs.find((t) => t.manifestId === manifest.id) ?? null;
+
+    return { ...manifest, loadingSheet: sheet, dockets, thc };
   }
 
   async createManifest(manifestData: CreateManifestRequest): Promise<Manifest> {
@@ -921,6 +1062,26 @@ class MemoryStorage implements IStorage {
     return [...this.thcs].sort(
       (a, b) => (b.createdAt?.getTime() ?? 0) - (a.createdAt?.getTime() ?? 0),
     );
+  }
+
+  async getThc(
+    id: number,
+  ): Promise<
+    | (Thc & { manifest: Manifest | null; loadingSheet: LoadingSheet | null; dockets: Docket[] })
+    | undefined
+  > {
+    const thc = this.thcs.find((t) => t.id === id);
+    if (!thc) return undefined;
+    const manifest = this.manifests.find((m) => m.id === thc.manifestId) ?? null;
+    const loadingSheet = manifest
+      ? this.loadingSheets.find((s) => s.id === manifest.loadingSheetId) ?? null
+      : null;
+    const docketLinks = manifest
+      ? this.loadingSheetDockets.filter((link) => link.loadingSheetId === manifest.loadingSheetId)
+      : [];
+    const dockets = this.dockets.filter((d) => docketLinks.some((link) => link.docketId === d.id));
+
+    return { ...thc, manifest, loadingSheet, dockets };
   }
 
   async createThc(thcData: InsertThc): Promise<Thc> {

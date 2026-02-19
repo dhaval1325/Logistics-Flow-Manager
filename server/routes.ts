@@ -389,6 +389,12 @@ export async function registerRoutes(
     res.json(thcs);
   });
 
+  app.get(api.thcs.get.path, async (req, res) => {
+    const thc = await storage.getThc(Number(req.params.id));
+    if (!thc) return res.status(404).json({ message: "THC not found" });
+    res.json(thc);
+  });
+
   app.post(api.thcs.create.path, async (req, res) => {
     const input = api.thcs.create.input.parse(req.body);
     const thc = await storage.createThc(input);

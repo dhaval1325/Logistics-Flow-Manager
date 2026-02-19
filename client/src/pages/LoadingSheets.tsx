@@ -200,6 +200,39 @@ export default function LoadingSheets() {
                   </div>
                 </div>
 
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div className="rounded-lg border border-border p-3">
+                    <div className="text-xs uppercase text-muted-foreground">Manifests</div>
+                    {selected.manifests?.length ? (
+                      <ul className="mt-2 space-y-1 text-xs text-muted-foreground">
+                        {selected.manifests.map((manifest) => (
+                          <li key={manifest.id}>
+                            <span className="font-semibold text-foreground">{manifest.manifestNumber}</span> •{" "}
+                            {manifest.status}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <div className="mt-2 text-xs text-muted-foreground">Not generated</div>
+                    )}
+                  </div>
+                  <div className="rounded-lg border border-border p-3">
+                    <div className="text-xs uppercase text-muted-foreground">THCs</div>
+                    {selected.thcs?.length ? (
+                      <ul className="mt-2 space-y-1 text-xs text-muted-foreground">
+                        {selected.thcs.map((thc) => (
+                          <li key={thc.id}>
+                            <span className="font-semibold text-foreground">{thc.thcNumber}</span> •{" "}
+                            {thc.status}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <div className="mt-2 text-xs text-muted-foreground">Not created</div>
+                    )}
+                  </div>
+                </div>
+
                 <div className="flex justify-end">
                   <Button
                     variant="outline"
@@ -208,6 +241,18 @@ export default function LoadingSheets() {
                         .map(
                           (d) =>
                             `<tr><td>${d.docketNumber}</td><td>${d.senderName}</td><td>${d.receiverName}</td><td>${d.status}</td></tr>`,
+                        )
+                        .join("");
+                      const manifestRows = (selected.manifests ?? [])
+                        .map(
+                          (manifest) =>
+                            `<tr><td>${manifest.manifestNumber}</td><td>${manifest.status}</td></tr>`,
+                        )
+                        .join("");
+                      const thcRows = (selected.thcs ?? [])
+                        .map(
+                          (thc) =>
+                            `<tr><td>${thc.thcNumber}</td><td>${thc.status}</td><td>${thc.hireAmount ?? ""}</td></tr>`,
                         )
                         .join("");
                       const bodyHtml = `
@@ -224,6 +269,20 @@ export default function LoadingSheets() {
                           <table>
                             <thead><tr><th>Docket #</th><th>Sender</th><th>Receiver</th><th>Status</th></tr></thead>
                             <tbody>${docketRows || "<tr><td colspan='4'>No dockets</td></tr>"}</tbody>
+                          </table>
+                        </div>
+                        <div class="section">
+                          <h2>Manifests</h2>
+                          <table>
+                            <thead><tr><th>Manifest #</th><th>Status</th></tr></thead>
+                            <tbody>${manifestRows || "<tr><td colspan='2'>Not generated</td></tr>"}</tbody>
+                          </table>
+                        </div>
+                        <div class="section">
+                          <h2>THCs</h2>
+                          <table>
+                            <thead><tr><th>THC #</th><th>Status</th><th>Hire Amt</th></tr></thead>
+                            <tbody>${thcRows || "<tr><td colspan='3'>Not created</td></tr>"}</tbody>
                           </table>
                         </div>
                       `;
