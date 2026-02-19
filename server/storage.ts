@@ -3,6 +3,7 @@ import { db as dbInstance } from "./db";
 import { 
   users,
   dockets, docketItems, loadingSheets, loadingSheetDockets, manifests, thcs, pods,
+  auditLogs,
   type User, type InsertUser,
   type Docket, type InsertDocket, type InsertDocketItem,
   type LoadingSheet, type InsertLoadingSheet,
@@ -10,9 +11,10 @@ import {
   type Manifest, type InsertManifest,
   type CreateManifestRequest,
   type Thc, type InsertThc,
-  type Pod, type InsertPod, type DocketItem
+  type Pod, type InsertPod, type DocketItem,
+  type AuditLog, type InsertAuditLog
 } from "@shared/schema";
-import { eq, desc, sql, inArray } from "drizzle-orm";
+import { eq, desc, sql, inArray, and } from "drizzle-orm";
 
 export interface IStorage {
   // Users
@@ -54,6 +56,18 @@ export interface IStorage {
   createPod(pod: InsertPod): Promise<Pod>;
   updatePodReview(id: number, status: "approved" | "rejected", rejectionReason?: string): Promise<Pod>;
   updatePodAnalysis(id: number, analysis: any): Promise<Pod>;
+
+  // Audit Logs
+  createAuditLog(log: InsertAuditLog): Promise<AuditLog>;
+  getAuditLogs(filters?: {
+    action?: string;
+    entityType?: string;
+    entityId?: number;
+    userId?: number;
+    search?: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<AuditLog[]>;
 
   // Dashboard
   getDashboardStats(): Promise<{
@@ -450,6 +464,47 @@ export class DatabaseStorage implements IStorage {
     return pod;
   }
 
+  // Audit Logs
+  async createAuditLog(logData: InsertAuditLog): Promise<AuditLog> {
+    const [log] = await this.db.insert(auditLogs).values(logData).returning();
+    return log;
+  }
+
+  async getAuditLogs(filters?: {
+    action?: string;
+    entityType?: string;
+    entityId?: number;
+    userId?: number;
+    search?: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<AuditLog[]> {
+    const conditions = [];
+    if (filters?.action) conditions.push(eq(auditLogs.action, filters.action));
+    if (filters?.entityType) conditions.push(eq(auditLogs.entityType, filters.entityType));
+    if (filters?.entityId != null) conditions.push(eq(auditLogs.entityId, filters.entityId));
+    if (filters?.userId != null) conditions.push(eq(auditLogs.userId, filters.userId));
+    if (filters?.search) {
+      const like = `%${filters.search}%`;
+      conditions.push(
+        sql`(${auditLogs.summary} ILIKE ${like} OR ${auditLogs.action} ILIKE ${like} OR ${auditLogs.username} ILIKE ${like})`,
+      );
+    }
+
+    let query = this.db.select().from(auditLogs) as any;
+    if (conditions.length > 0) {
+      query = query.where(and(...conditions));
+    }
+    query = query.orderBy(desc(auditLogs.createdAt));
+    if (filters?.limit) {
+      query = query.limit(filters.limit);
+    }
+    if (filters?.offset) {
+      query = query.offset(filters.offset);
+    }
+    return await query;
+  }
+
   async getDashboardStats() {
     const now = new Date();
     const weekBuckets = buildWeeklyBuckets(now);
@@ -531,6 +586,7 @@ class MemoryStorage implements IStorage {
   private manifests: Manifest[] = [];
   private thcs: Thc[] = [];
   private pods: Pod[] = [];
+  private auditLogs: AuditLog[] = [];
   private counters = {
     user: 1,
     docket: 1,
@@ -540,6 +596,7 @@ class MemoryStorage implements IStorage {
     manifest: 1,
     thc: 1,
     pod: 1,
+    auditLog: 1,
   };
 
   private nextId(key: keyof typeof this.counters) {
@@ -954,6 +1011,58 @@ class MemoryStorage implements IStorage {
 
     pod.aiAnalysis = analysis;
     return pod;
+  }
+
+  async createAuditLog(logData: InsertAuditLog): Promise<AuditLog> {
+    const log: AuditLog = {
+      id: this.nextId("auditLog"),
+      userId: logData.userId ?? null,
+      username: logData.username ?? null,
+      action: logData.action,
+      entityType: logData.entityType ?? null,
+      entityId: logData.entityId ?? null,
+      summary: logData.summary ?? null,
+      meta: logData.meta ?? null,
+      ip: logData.ip ?? null,
+      userAgent: logData.userAgent ?? null,
+      createdAt: new Date(),
+    };
+    this.auditLogs.push(log);
+    return log;
+  }
+
+  async getAuditLogs(filters?: {
+    action?: string;
+    entityType?: string;
+    entityId?: number;
+    userId?: number;
+    search?: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<AuditLog[]> {
+    const search = filters?.search?.toLowerCase();
+    let results = [...this.auditLogs].sort(
+      (a, b) => (b.createdAt?.getTime() ?? 0) - (a.createdAt?.getTime() ?? 0),
+    );
+
+    if (filters?.action) results = results.filter((l) => l.action === filters.action);
+    if (filters?.entityType) results = results.filter((l) => l.entityType === filters.entityType);
+    if (filters?.entityId != null) results = results.filter((l) => l.entityId === filters.entityId);
+    if (filters?.userId != null) results = results.filter((l) => l.userId === filters.userId);
+    if (search) {
+      results = results.filter((l) => {
+        return (
+          l.summary?.toLowerCase().includes(search) ||
+          l.action.toLowerCase().includes(search) ||
+          l.username?.toLowerCase().includes(search) ||
+          l.entityType?.toLowerCase().includes(search)
+        );
+      });
+    }
+
+    const offset = filters?.offset ?? 0;
+    const limit = filters?.limit ?? results.length;
+    return results.slice(offset, offset + limit);
   }
 
   async getDashboardStats() {

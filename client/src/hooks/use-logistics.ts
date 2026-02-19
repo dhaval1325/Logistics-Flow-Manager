@@ -349,3 +349,29 @@ export function useDashboard() {
     refetchInterval: 5000,
   });
 }
+
+// ==========================================
+// AUDIT LOGS
+// ==========================================
+
+export function useAuditLogs(filters?: {
+  action?: string;
+  entityType?: string;
+  entityId?: number;
+  userId?: number;
+  search?: string;
+  limit?: number;
+  offset?: number;
+}) {
+  const queryString = filters ? `?${new URLSearchParams(filters as any).toString()}` : "";
+  return useQuery({
+    queryKey: [api.auditLogs.list.path, filters],
+    queryFn: async () => {
+      const res = await fetch(`${api.auditLogs.list.path}${queryString}`, {
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to fetch audit logs");
+      return api.auditLogs.list.responses[200].parse(await res.json());
+    },
+  });
+}
