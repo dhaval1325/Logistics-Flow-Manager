@@ -65,6 +65,7 @@ export function setupAuth(app: Express) {
       secret: SESSION_SECRET,
       resave: false,
       saveUninitialized: false,
+      proxy: true,
       store,
       cookie: {
         httpOnly: true,

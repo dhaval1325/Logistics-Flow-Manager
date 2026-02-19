@@ -10,6 +10,9 @@ const app = express();
 const httpServer = createServer(app);
 const uploadsDir = path.resolve(process.cwd(), "uploads");
 
+// Trust proxy headers (Render/Cloudflare/etc) so secure cookies work behind HTTPS termination.
+app.set("trust proxy", 1);
+
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
 }
