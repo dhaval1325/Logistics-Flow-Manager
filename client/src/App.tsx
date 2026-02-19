@@ -14,6 +14,7 @@ import Manifests from "@/pages/Manifests";
 import ThcManagement from "@/pages/ThcManagement";
 import PodReview from "@/pages/PodReview";
 import DocketTracker from "@/pages/DocketTracker";
+import AuditLogs from "@/pages/AuditLogs";
 import NotFound from "@/pages/not-found";
 import Login from "@/pages/Login";
 import Register from "@/pages/Register";
@@ -66,6 +67,7 @@ function Router() {
             <Route path="/thc" component={ThcManagement} />
             <Route path="/pod" component={PodReview} />
             <Route path="/tracker" component={DocketTracker} />
+            <Route path="/audit-logs" component={AuditLogs} />
             <Route component={NotFound} />
           </Switch>
         </div>
