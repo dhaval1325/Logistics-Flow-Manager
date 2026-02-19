@@ -32,6 +32,11 @@ async function seed() {
     specialInstructions: "Handle with care",
     totalWeight: "500.00",
     totalPackages: 10,
+    geofenceLat: "40.7128",
+    geofenceLng: "-74.0060",
+    geofenceRadiusKm: "6",
+    currentLat: "40.7306",
+    currentLng: "-73.9352",
     items: [
       { description: "Electronics", weight: "200.00", quantity: 5, packageType: "box" },
       { description: "Cables", weight: "300.00", quantity: 5, packageType: "pallet" }
@@ -50,6 +55,11 @@ async function seed() {
     specialInstructions: "Urgent delivery",
     totalWeight: "150.50",
     totalPackages: 2,
+    geofenceLat: "34.0522",
+    geofenceLng: "-118.2437",
+    geofenceRadiusKm: "4",
+    currentLat: "34.0407",
+    currentLng: "-118.2468",
     items: [
       { description: "Laptops", weight: "150.50", quantity: 2, packageType: "box" }
     ]
@@ -67,6 +77,11 @@ async function seed() {
     specialInstructions: "Temperature controlled",
     totalWeight: "1000.00",
     totalPackages: 20,
+    geofenceLat: "29.7604",
+    geofenceLng: "-95.3698",
+    geofenceRadiusKm: "8",
+    currentLat: "29.7499",
+    currentLng: "-95.3584",
     items: [
       { description: "Vegetables", weight: "1000.00", quantity: 20, packageType: "crate" }
     ]

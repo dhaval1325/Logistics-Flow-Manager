@@ -8,6 +8,8 @@ import { openai } from "./replit_integrations/image/client";
 import multer from "multer";
 import fs from "fs";
 import path from "path";
+import passport from "passport";
+import { hashPassword, requireAuth, sanitizeUser } from "./auth";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -30,6 +32,78 @@ export async function registerRoutes(
     limits: { fileSize: 5 * 1024 * 1024 },
   });
 
+  // Auth
+  app.post(api.auth.register.path, async (req, res, next) => {
+    try {
+      const input = api.auth.register.input.parse(req.body);
+      const existingUser = await storage.getUserByUsername(input.username);
+      if (existingUser) {
+        return res.status(400).json({ message: "Username already exists" });
+      }
+
+      const createdUser = await storage.createUser({
+        username: input.username,
+        password: hashPassword(input.password),
+        role: input.role ?? "staff",
+      });
+
+      req.login(createdUser, (err) => {
+        if (err) return next(err);
+        return res.status(201).json(sanitizeUser(createdUser));
+      });
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: err.errors[0].message });
+      }
+      throw err;
+    }
+  });
+
+  app.post(api.auth.login.path, (req, res, next) => {
+    const parsed = api.auth.login.input.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ message: parsed.error.errors[0].message });
+    }
+
+    passport.authenticate("local", (err: any, user: any, info: any) => {
+      if (err) {
+        return next(err);
+      }
+      if (!user) {
+        return res.status(401).json({ message: info?.message || "Invalid credentials" });
+      }
+      req.login(user, (loginErr) => {
+        if (loginErr) {
+          return next(loginErr);
+        }
+        return res.json(sanitizeUser(user));
+      });
+    })(req, res, next);
+  });
+
+  app.post(api.auth.logout.path, (req, res, next) => {
+    req.logout((err) => {
+      if (err) return next(err);
+      req.session?.destroy(() => {
+        res.json({ ok: true });
+      });
+    });
+  });
+
+  app.get(api.auth.me.path, (req, res) => {
+    if (!req.isAuthenticated || !req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    return res.json(sanitizeUser(req.user as any));
+  });
+
+  app.use("/api", (req, res, next) => {
+    if (req.path.startsWith("/auth")) {
+      return next();
+    }
+    return requireAuth(req, res, next);
+  });
+
   app.get(api.dashboard.get.path, async (_req, res) => {
     const dashboard = await storage.getDashboardStats();
     res.json(dashboard);
@@ -47,6 +121,12 @@ export async function registerRoutes(
     const docket = await storage.getDocket(Number(req.params.id));
     if (!docket) return res.status(404).json({ message: "Docket not found" });
     res.json(docket);
+  });
+
+  app.get(api.dockets.tracker.path, async (req, res) => {
+    const tracker = await storage.getDocketTracker(Number(req.params.id));
+    if (!tracker) return res.status(404).json({ message: "Docket not found" });
+    res.json(tracker);
   });
 
   app.post(api.dockets.create.path, async (req, res) => {

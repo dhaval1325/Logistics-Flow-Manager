@@ -41,6 +41,26 @@ const formSchema = insertDocketSchema.extend({
   items: z.array(itemSchema).min(1, "Add at least one item"),
   totalWeight: z.coerce.number(), // Coerce from input string
   totalPackages: z.coerce.number(),
+  geofenceLat: z.preprocess(
+    (value) => (value === "" || value == null ? undefined : Number(value)),
+    z.number().optional(),
+  ),
+  geofenceLng: z.preprocess(
+    (value) => (value === "" || value == null ? undefined : Number(value)),
+    z.number().optional(),
+  ),
+  geofenceRadiusKm: z.preprocess(
+    (value) => (value === "" || value == null ? undefined : Number(value)),
+    z.number().positive().optional(),
+  ),
+  currentLat: z.preprocess(
+    (value) => (value === "" || value == null ? undefined : Number(value)),
+    z.number().optional(),
+  ),
+  currentLng: z.preprocess(
+    (value) => (value === "" || value == null ? undefined : Number(value)),
+    z.number().optional(),
+  ),
 });
 
 type FormData = z.infer<typeof formSchema>;
@@ -144,7 +164,12 @@ function CreateDocketForm({ onSuccess }: { onSuccess: () => void }) {
       docketNumber: `DKT-${Math.floor(Math.random() * 10000)}`,
       items: [{ description: "", weight: 0, quantity: 1, packageType: "box" }],
       totalWeight: 0,
-      totalPackages: 0
+      totalPackages: 0,
+      geofenceLat: undefined,
+      geofenceLng: undefined,
+      geofenceRadiusKm: undefined,
+      currentLat: undefined,
+      currentLng: undefined,
     }
   });
 
@@ -158,10 +183,19 @@ function CreateDocketForm({ onSuccess }: { onSuccess: () => void }) {
     const totalWeight = data.items.reduce((sum, item) => sum + Number(item.weight), 0);
     const totalPackages = data.items.reduce((sum, item) => sum + Number(item.quantity), 0);
 
+    const trackingFields = {
+      geofenceLat: data.geofenceLat != null ? String(data.geofenceLat) : undefined,
+      geofenceLng: data.geofenceLng != null ? String(data.geofenceLng) : undefined,
+      geofenceRadiusKm: data.geofenceRadiusKm != null ? String(data.geofenceRadiusKm) : undefined,
+      currentLat: data.currentLat != null ? String(data.currentLat) : undefined,
+      currentLng: data.currentLng != null ? String(data.currentLng) : undefined,
+    };
+
     mutate({
       ...data,
       totalWeight: String(totalWeight), // Schema expects decimal string or number
       totalPackages,
+      ...trackingFields,
       // Ensure strings for decimal fields in items
       items: data.items.map(item => ({ ...item, weight: String(item.weight) }))
     } as any, {
@@ -309,6 +343,76 @@ function CreateDocketForm({ onSuccess }: { onSuccess: () => void }) {
               </div>
             </div>
           ))}
+        </div>
+
+        <div className="space-y-4 rounded-lg border border-dashed border-border p-4">
+          <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">
+            Geofence & Tracking (Optional)
+          </h3>
+          <div className="grid grid-cols-2 gap-4">
+            <FormField
+              control={form.control}
+              name="geofenceLat"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Geofence Latitude</FormLabel>
+                  <FormControl><Input type="number" step="0.0001" placeholder="e.g. 19.0760" {...field} /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="geofenceLng"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Geofence Longitude</FormLabel>
+                  <FormControl><Input type="number" step="0.0001" placeholder="e.g. 72.8777" {...field} /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <FormField
+              control={form.control}
+              name="geofenceRadiusKm"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Geofence Radius (km)</FormLabel>
+                  <FormControl><Input type="number" step="0.1" placeholder="e.g. 5" {...field} /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <div className="text-xs text-muted-foreground flex items-center">
+              Set the geofence center + radius to highlight on the tracker map.
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <FormField
+              control={form.control}
+              name="currentLat"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Current Latitude</FormLabel>
+                  <FormControl><Input type="number" step="0.0001" placeholder="e.g. 19.0896" {...field} /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="currentLng"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Current Longitude</FormLabel>
+                  <FormControl><Input type="number" step="0.0001" placeholder="e.g. 72.8656" {...field} /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
         </div>
 
         <div className="flex justify-end gap-2 pt-4 border-t">

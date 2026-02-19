@@ -27,6 +27,11 @@ export const dockets = pgTable("dockets", {
   specialInstructions: text("special_instructions"),
   totalWeight: decimal("total_weight"),
   totalPackages: integer("total_packages"),
+  geofenceLat: decimal("geofence_lat"),
+  geofenceLng: decimal("geofence_lng"),
+  geofenceRadiusKm: decimal("geofence_radius_km"),
+  currentLat: decimal("current_lat"),
+  currentLng: decimal("current_lng"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
