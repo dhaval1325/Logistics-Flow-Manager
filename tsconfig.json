@@ -5,9 +5,9 @@
     "build",
     "dist",
     "**/*.test.ts",
-    "server/replit_integrations/audio/**",
-    "server/replit_integrations/chat/**",
-    "server/replit_integrations/batch/**"
+    "server/ai_integrations/audio/**",
+    "server/ai_integrations/chat/**",
+    "server/ai_integrations/batch/**"
   ],
   "compilerOptions": {
     "incremental": true,

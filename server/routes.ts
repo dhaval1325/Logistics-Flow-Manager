@@ -4,12 +4,74 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { api } from "@shared/routes";
 import { z } from "zod";
-import { openai } from "./replit_integrations/image/client";
+import { openai } from "./ai_integrations/image/client";
 import multer from "multer";
 import fs from "fs";
 import path from "path";
 import passport from "passport";
 import { hashPassword, requireAuth, sanitizeUser } from "./auth";
+
+const geocodeCache = new Map<string, { lat: number; lng: number } | null>();
+let lastGeocodeAt = 0;
+
+function normalizeAddress(value?: string | null) {
+  return value?.trim() ?? "";
+}
+
+async function geocodeAddress(address: string) {
+  const normalized = normalizeAddress(address);
+  if (!normalized) return null;
+  if (typeof fetch !== "function") {
+    console.warn("Geocode skipped: fetch is not available in this runtime.");
+    return null;
+  }
+  if (geocodeCache.has(normalized)) {
+    return geocodeCache.get(normalized) ?? null;
+  }
+
+  const now = Date.now();
+  const elapsed = now - lastGeocodeAt;
+  if (elapsed < 1100) {
+    await new Promise((resolve) => setTimeout(resolve, 1100 - elapsed));
+  }
+  lastGeocodeAt = Date.now();
+
+  const url = new URL("https://nominatim.openstreetmap.org/search");
+  url.searchParams.set("q", normalized);
+  url.searchParams.set("format", "json");
+  url.searchParams.set("limit", "1");
+  url.searchParams.set("addressdetails", "0");
+
+  const userAgent =
+    process.env.GEOCODE_USER_AGENT ?? "LogisticsFlowManager/1.0 (self-hosted)";
+
+  const response = await fetch(url.toString(), {
+    headers: {
+      "User-Agent": userAgent,
+      "Accept-Language": "en",
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(`Geocode request failed: ${response.status}`);
+  }
+
+  const data = (await response.json()) as Array<{ lat: string; lon: string }>;
+  const first = data[0];
+  if (!first) {
+    geocodeCache.set(normalized, null);
+    return null;
+  }
+
+  const result = { lat: Number(first.lat), lng: Number(first.lon) };
+  if (Number.isNaN(result.lat) || Number.isNaN(result.lng)) {
+    geocodeCache.set(normalized, null);
+    return null;
+  }
+
+  geocodeCache.set(normalized, result);
+  return result;
+}
 
 export async function registerRoutes(
   httpServer: Server,
@@ -132,7 +194,39 @@ export async function registerRoutes(
   app.post(api.dockets.create.path, async (req, res) => {
     try {
       const input = api.dockets.create.input.parse(req.body);
-      const docket = await storage.createDocket(input);
+      const nextInput = { ...input };
+
+      const needsGeofence = nextInput.geofenceLat == null || nextInput.geofenceLng == null;
+      const needsCurrent = nextInput.currentLat == null || nextInput.currentLng == null;
+
+      if (needsGeofence) {
+        try {
+          const geofence = await geocodeAddress(nextInput.receiverAddress);
+          if (geofence) {
+            nextInput.geofenceLat = String(geofence.lat);
+            nextInput.geofenceLng = String(geofence.lng);
+            if (nextInput.geofenceRadiusKm == null) {
+              nextInput.geofenceRadiusKm = "5";
+            }
+          }
+        } catch (error) {
+          console.warn("Geofence geocode failed:", error);
+        }
+      }
+
+      if (needsCurrent) {
+        try {
+          const current = await geocodeAddress(nextInput.senderAddress);
+          if (current) {
+            nextInput.currentLat = String(current.lat);
+            nextInput.currentLng = String(current.lng);
+          }
+        } catch (error) {
+          console.warn("Current location geocode failed:", error);
+        }
+      }
+
+      const docket = await storage.createDocket(nextInput);
       res.status(201).json(docket);
     } catch (err) {
       if (err instanceof z.ZodError) {

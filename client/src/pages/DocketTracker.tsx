@@ -15,6 +15,13 @@ import { useDockets, useDocketTracker } from "@/hooks/use-logistics";
 import { cn } from "@/lib/utils";
 import { MapContainer, TileLayer, Circle, CircleMarker, Polyline } from "react-leaflet";
 
+type TrackerEvent = {
+  key: string;
+  label: string;
+  timestamp: string | null;
+  meta?: Record<string, any>;
+};
+
 function formatTimestamp(value: string | null) {
   if (!value) return "Pending";
   const date = new Date(value);
@@ -61,7 +68,7 @@ export default function DocketTracker() {
   }, [dockets, selectedId]);
 
   const trackerQuery = useDocketTracker(selectedId ?? 0);
-  const fallbackEvents = useMemo(
+  const fallbackEvents = useMemo<TrackerEvent[]>(
     () => [
       { key: "docket_created", label: "Docket created", timestamp: null },
       { key: "loading_sheet_created", label: "Loading sheet created", timestamp: null },
@@ -71,7 +78,7 @@ export default function DocketTracker() {
     ],
     [],
   );
-  const events = trackerQuery.data?.events ?? (selectedId ? fallbackEvents : []);
+  const events: TrackerEvent[] = trackerQuery.data?.events ?? (selectedId ? fallbackEvents : []);
   const docketStatus = trackerQuery.data?.status ?? "—";
   const geofence = trackerQuery.data?.geofence ?? null;
   const currentLocation = trackerQuery.data?.currentLocation ?? null;
