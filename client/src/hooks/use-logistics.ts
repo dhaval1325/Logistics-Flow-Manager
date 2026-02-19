@@ -96,6 +96,19 @@ export function useLoadingSheets() {
   });
 }
 
+export function useLoadingSheet(id: number) {
+  return useQuery({
+    queryKey: [api.loadingSheets.get.path, id],
+    queryFn: async () => {
+      const url = buildUrl(api.loadingSheets.get.path, { id });
+      const res = await fetch(url, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch loading sheet");
+      return api.loadingSheets.get.responses[200].parse(await res.json());
+    },
+    enabled: !!id,
+  });
+}
+
 export function useCreateLoadingSheet() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -155,6 +168,19 @@ export function useManifests() {
       if (!res.ok) throw new Error("Failed to fetch manifests");
       return api.manifests.list.responses[200].parse(await res.json());
     },
+  });
+}
+
+export function useManifest(id: number) {
+  return useQuery({
+    queryKey: [api.manifests.get.path, id],
+    queryFn: async () => {
+      const url = buildUrl(api.manifests.get.path, { id });
+      const res = await fetch(url, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch manifest");
+      return api.manifests.get.responses[200].parse(await res.json());
+    },
+    enabled: !!id,
   });
 }
 

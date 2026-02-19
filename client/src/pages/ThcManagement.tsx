@@ -7,15 +7,22 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent } from "@/components/ui/card";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Plus, Loader2 } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { openPrintWindow } from "@/lib/print";
 
 export default function ThcManagement() {
   const { data: thcs, isLoading } = useThcs();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const selected = useMemo(
+    () => thcs?.find((thc) => thc.id === selectedId) ?? null,
+    [thcs, selectedId],
+  );
 
   return (
     <div className="space-y-6">
@@ -50,18 +57,19 @@ export default function ThcManagement() {
                 <TableHead>Advance</TableHead>
                 <TableHead>Balance</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead className="text-right">View/Print</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="h-32 text-center">
+                  <TableCell colSpan={7} className="h-32 text-center">
                     <Loader2 className="w-6 h-6 animate-spin mx-auto text-primary" />
                   </TableCell>
                 </TableRow>
               ) : thcs?.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="h-32 text-center text-muted-foreground">
+                  <TableCell colSpan={7} className="h-32 text-center text-muted-foreground">
                     No THCs created.
                   </TableCell>
                 </TableRow>
@@ -74,6 +82,11 @@ export default function ThcManagement() {
                     <TableCell className="font-mono text-green-600">${Number(thc.advanceAmount).toFixed(2)}</TableCell>
                     <TableCell className="font-mono text-red-600 font-medium">${Number(thc.balanceAmount).toFixed(2)}</TableCell>
                     <TableCell><StatusBadge status={thc.status} /></TableCell>
+                    <TableCell className="text-right">
+                      <Button size="sm" variant="outline" onClick={() => setSelectedId(thc.id)}>
+                        View
+                      </Button>
+                    </TableCell>
                   </TableRow>
                 ))
               )}
@@ -81,6 +94,87 @@ export default function ThcManagement() {
           </Table>
         </CardContent>
       </Card>
+
+      <Dialog open={!!selected} onOpenChange={(open) => (!open ? setSelectedId(null) : undefined)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>THC Details</DialogTitle>
+          </DialogHeader>
+          {selected && (
+            <ScrollArea className="max-h-[70vh] pr-4">
+              <div className="space-y-4 text-sm">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div>
+                    <div className="text-xs uppercase text-muted-foreground">THC #</div>
+                    <div className="font-medium">{selected.thcNumber}</div>
+                  </div>
+                  <div>
+                    <div className="text-xs uppercase text-muted-foreground">Status</div>
+                    <div className="font-medium capitalize">{selected.status}</div>
+                  </div>
+                  <div>
+                    <div className="text-xs uppercase text-muted-foreground">Manifest</div>
+                    <div className="font-medium">{selected.manifestId}</div>
+                  </div>
+                  <div>
+                    <div className="text-xs uppercase text-muted-foreground">Driver</div>
+                    <div className="font-medium">{selected.driverName ?? "--"}</div>
+                  </div>
+                  <div>
+                    <div className="text-xs uppercase text-muted-foreground">Vehicle</div>
+                    <div className="font-medium">{selected.vehicleNumber ?? "--"}</div>
+                  </div>
+                </div>
+
+                <div className="rounded-lg border border-border p-3 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Hire Amount</span>
+                    <span className="font-mono">${Number(selected.hireAmount).toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between mt-1">
+                    <span className="text-muted-foreground">Advance</span>
+                    <span className="font-mono">${Number(selected.advanceAmount).toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between mt-1">
+                    <span className="text-muted-foreground">Balance</span>
+                    <span className="font-mono font-semibold">${Number(selected.balanceAmount).toFixed(2)}</span>
+                  </div>
+                </div>
+
+                <div className="flex justify-end">
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      const bodyHtml = `
+                        <div class="grid">
+                          <div><div class="meta">THC #</div><div>${selected.thcNumber}</div></div>
+                          <div><div class="meta">Status</div><div>${selected.status}</div></div>
+                          <div><div class="meta">Manifest</div><div>${selected.manifestId}</div></div>
+                          <div><div class="meta">Driver</div><div>${selected.driverName ?? "--"}</div></div>
+                          <div><div class="meta">Vehicle</div><div>${selected.vehicleNumber ?? "--"}</div></div>
+                        </div>
+                        <div class="section">
+                          <h2>Amounts</h2>
+                          <table>
+                            <tbody>
+                              <tr><th>Hire Amount</th><td>$${Number(selected.hireAmount).toFixed(2)}</td></tr>
+                              <tr><th>Advance</th><td>$${Number(selected.advanceAmount).toFixed(2)}</td></tr>
+                              <tr><th>Balance</th><td>$${Number(selected.balanceAmount).toFixed(2)}</td></tr>
+                            </tbody>
+                          </table>
+                        </div>
+                      `;
+                      openPrintWindow(`THC ${selected.thcNumber}`, bodyHtml);
+                    }}
+                  >
+                    Print
+                  </Button>
+                </div>
+              </div>
+            </ScrollArea>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -7,9 +7,9 @@ import {
 import { 
   Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle 
 } from "@/components/ui/card";
-import { Upload, FileImage, Sparkles, Check, X, AlertCircle, Loader2 } from "lucide-react";
+import { Upload, FileImage, Sparkles, Check, X, AlertCircle, Loader2, Printer } from "lucide-react";
 import { StatusBadge } from "@/components/StatusBadge";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -17,6 +17,8 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { useDockets } from "@/hooks/use-logistics";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { openPrintWindow } from "@/lib/print";
 
 const uploadSchema = z.object({
   docketId: z.coerce.number().min(1, "Select a docket"),
@@ -32,6 +34,8 @@ export default function PodReview() {
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
   const [rejectId, setRejectId] = useState<number | null>(null);
+  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const selected = useMemo(() => pods?.find((pod) => pod.id === selectedId) ?? null, [pods, selectedId]);
 
   const handleApprove = (id: number) => {
     review({ id, status: "approved" });
@@ -133,6 +137,14 @@ export default function PodReview() {
                 )}
               </CardContent>
               <CardFooter className="pt-0 gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="flex-1"
+                  onClick={() => setSelectedId(pod.id)}
+                >
+                  <Printer className="w-4 h-4 mr-1" /> View/Print
+                </Button>
                 {pod.status === 'pending_review' && (
                   <>
                     {rejectId === pod.id ? (
@@ -181,6 +193,67 @@ export default function PodReview() {
           ))
         )}
       </div>
+
+      <Dialog open={!!selected} onOpenChange={(open) => (!open ? setSelectedId(null) : undefined)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>POD Details</DialogTitle>
+          </DialogHeader>
+          {selected && (
+            <ScrollArea className="max-h-[70vh] pr-4">
+              <div className="space-y-4 text-sm">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div>
+                    <div className="text-xs uppercase text-muted-foreground">Docket</div>
+                    <div className="font-medium">#{selected.docketId}</div>
+                  </div>
+                  <div>
+                    <div className="text-xs uppercase text-muted-foreground">Status</div>
+                    <div className="font-medium capitalize">{selected.status}</div>
+                  </div>
+                  <div>
+                    <div className="text-xs uppercase text-muted-foreground">Uploaded</div>
+                    <div className="font-medium">
+                      {selected.createdAt ? new Date(selected.createdAt).toLocaleString() : "--"}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-xs uppercase text-muted-foreground">Image URL</div>
+                    <div className="text-xs text-muted-foreground break-all">{selected.imageUrl}</div>
+                  </div>
+                </div>
+
+                <div className="rounded-lg border border-border overflow-hidden">
+                  <img src={selected.imageUrl} alt="POD" className="w-full h-auto" />
+                </div>
+
+                <div className="flex justify-end">
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      const bodyHtml = `
+                        <div class="grid">
+                          <div><div class="meta">Docket</div><div>#${selected.docketId}</div></div>
+                          <div><div class="meta">Status</div><div>${selected.status}</div></div>
+                          <div><div class="meta">Uploaded</div><div>${selected.createdAt ? new Date(selected.createdAt).toLocaleString() : "--"}</div></div>
+                          <div><div class="meta">Image</div><div>${selected.imageUrl}</div></div>
+                        </div>
+                        <div class="section">
+                          <h2>POD Image</h2>
+                          <img src="${selected.imageUrl}" alt="POD" />
+                        </div>
+                      `;
+                      openPrintWindow(`POD Docket #${selected.docketId}`, bodyHtml);
+                    }}
+                  >
+                    Print
+                  </Button>
+                </div>
+              </div>
+            </ScrollArea>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useDockets, useCreateDocket } from "@/hooks/use-logistics";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,6 +25,8 @@ import { insertDocketSchema, insertDocketItemSchema } from "@shared/schema";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Card, CardContent } from "@/components/ui/card";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { openPrintWindow } from "@/lib/print";
 
 const itemSchema = insertDocketItemSchema.extend({
   weight: z.coerce.number(),
@@ -69,6 +71,12 @@ export default function Dockets() {
   const [search, setSearch] = useState("");
   const { data: dockets, isLoading } = useDockets({ search });
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [selectedId, setSelectedId] = useState<number | null>(null);
+
+  const selected = useMemo(
+    () => dockets?.find((docket) => docket.id === selectedId) ?? null,
+    [dockets, selectedId],
+  );
 
   return (
     <div className="space-y-6">
@@ -116,18 +124,19 @@ export default function Dockets() {
                   <TableHead className="font-semibold">Items</TableHead>
                   <TableHead className="font-semibold">Weight</TableHead>
                   <TableHead className="font-semibold">Status</TableHead>
+                  <TableHead className="font-semibold text-right">View/Print</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {isLoading ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="h-32 text-center">
+                    <TableCell colSpan={8} className="h-32 text-center">
                       <Loader2 className="w-6 h-6 animate-spin mx-auto text-primary" />
                     </TableCell>
                   </TableRow>
                 ) : dockets?.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="h-32 text-center text-muted-foreground">
+                    <TableCell colSpan={8} className="h-32 text-center text-muted-foreground">
                       No dockets found. Create one to get started.
                     </TableCell>
                   </TableRow>
@@ -143,6 +152,11 @@ export default function Dockets() {
                       <TableCell>
                         <StatusBadge status={docket.status} />
                       </TableCell>
+                      <TableCell className="text-right">
+                        <Button size="sm" variant="outline" onClick={() => setSelectedId(docket.id)}>
+                          View
+                        </Button>
+                      </TableCell>
                     </TableRow>
                   ))
                 )}
@@ -151,6 +165,116 @@ export default function Dockets() {
           </div>
         </CardContent>
       </Card>
+
+      <Dialog open={!!selected} onOpenChange={(open) => (!open ? setSelectedId(null) : undefined)}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Docket Details</DialogTitle>
+          </DialogHeader>
+          {selected && (
+            <ScrollArea className="max-h-[70vh] pr-4">
+              <div className="space-y-4 text-sm">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div>
+                    <div className="text-xs uppercase text-muted-foreground">Docket #</div>
+                    <div className="font-medium">{selected.docketNumber}</div>
+                  </div>
+                  <div>
+                    <div className="text-xs uppercase text-muted-foreground">Status</div>
+                    <div className="font-medium capitalize">{selected.status}</div>
+                  </div>
+                  <div>
+                    <div className="text-xs uppercase text-muted-foreground">Sender</div>
+                    <div className="font-medium">{selected.senderName}</div>
+                    <div className="text-xs text-muted-foreground">{selected.senderAddress}</div>
+                  </div>
+                  <div>
+                    <div className="text-xs uppercase text-muted-foreground">Receiver</div>
+                    <div className="font-medium">{selected.receiverName}</div>
+                    <div className="text-xs text-muted-foreground">{selected.receiverAddress}</div>
+                  </div>
+                  <div>
+                    <div className="text-xs uppercase text-muted-foreground">Total Packages</div>
+                    <div className="font-medium">{selected.totalPackages ?? 0}</div>
+                  </div>
+                  <div>
+                    <div className="text-xs uppercase text-muted-foreground">Total Weight</div>
+                    <div className="font-medium">{selected.totalWeight ?? 0} kg</div>
+                  </div>
+                </div>
+
+                <div>
+                  <div className="text-xs uppercase text-muted-foreground mb-2">Items</div>
+                  <div className="rounded-lg border border-border overflow-hidden">
+                    <Table>
+                      <TableHeader className="bg-muted/50">
+                        <TableRow>
+                          <TableHead>Description</TableHead>
+                          <TableHead>Type</TableHead>
+                          <TableHead>Weight</TableHead>
+                          <TableHead>Qty</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {selected.items?.length ? (
+                          selected.items.map((item) => (
+                            <TableRow key={item.id}>
+                              <TableCell>{item.description}</TableCell>
+                              <TableCell>{item.packageType}</TableCell>
+                              <TableCell>{item.weight}</TableCell>
+                              <TableCell>{item.quantity}</TableCell>
+                            </TableRow>
+                          ))
+                        ) : (
+                          <TableRow>
+                            <TableCell colSpan={4} className="text-center text-muted-foreground">
+                              No items
+                            </TableCell>
+                          </TableRow>
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
+
+                <div className="flex justify-end">
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      const itemsRows = (selected.items ?? [])
+                        .map(
+                          (item) =>
+                            `<tr><td>${item.description}</td><td>${item.packageType}</td><td>${item.weight}</td><td>${item.quantity}</td></tr>`,
+                        )
+                        .join("");
+                      const bodyHtml = `
+                        <div class="grid">
+                          <div><div class="meta">Docket #</div><div>${selected.docketNumber}</div></div>
+                          <div><div class="meta">Status</div><div>${selected.status}</div></div>
+                          <div><div class="meta">Sender</div><div>${selected.senderName}</div><div class="meta">${selected.senderAddress}</div></div>
+                          <div><div class="meta">Receiver</div><div>${selected.receiverName}</div><div class="meta">${selected.receiverAddress}</div></div>
+                          <div><div class="meta">Total Packages</div><div>${selected.totalPackages ?? 0}</div></div>
+                          <div><div class="meta">Total Weight</div><div>${selected.totalWeight ?? 0} kg</div></div>
+                        </div>
+                        <div class="section">
+                          <h2>Items</h2>
+                          <table>
+                            <thead><tr><th>Description</th><th>Type</th><th>Weight</th><th>Qty</th></tr></thead>
+                            <tbody>${itemsRows || "<tr><td colspan='4'>No items</td></tr>"}</tbody>
+                          </table>
+                        </div>
+                      `;
+                      openPrintWindow(`Docket ${selected.docketNumber}`, bodyHtml);
+                    }}
+                  >
+                    Print
+                  </Button>
+                </div>
+              </div>
+            </ScrollArea>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

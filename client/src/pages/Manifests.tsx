@@ -1,4 +1,4 @@
-import { useManifests, useCreateManifest, useLoadingSheets } from "@/hooks/use-logistics";
+import { useManifests, useCreateManifest, useLoadingSheets, useManifest } from "@/hooks/use-logistics";
 import { Button } from "@/components/ui/button";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
 import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -6,15 +6,20 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent } from "@/components/ui/card";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Plus, FileText, Loader2 } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { openPrintWindow } from "@/lib/print";
 
 export default function Manifests() {
   const { data: manifests, isLoading } = useManifests();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const manifestQuery = useManifest(selectedId ?? 0);
+  const selected = useMemo(() => manifestQuery.data ?? null, [manifestQuery.data]);
 
   return (
     <div className="space-y-6">
@@ -42,14 +47,14 @@ export default function Manifests() {
         <CardContent className="p-0">
           <Table>
             <TableHeader className="bg-muted/50">
-              <TableRow>
-                <TableHead>Manifest #</TableHead>
-                <TableHead>Loading Sheet Ref</TableHead>
-                <TableHead>Generated At</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Actions</TableHead>
-              </TableRow>
-            </TableHeader>
+                <TableRow>
+                  <TableHead>Manifest #</TableHead>
+                  <TableHead>Loading Sheet Ref</TableHead>
+                  <TableHead>Generated At</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Actions</TableHead>
+                </TableRow>
+              </TableHeader>
             <TableBody>
               {isLoading ? (
                 <TableRow>
@@ -71,7 +76,7 @@ export default function Manifests() {
                     <TableCell>{new Date(m.generatedAt!).toLocaleString()}</TableCell>
                     <TableCell><StatusBadge status={m.status} /></TableCell>
                     <TableCell>
-                      <Button variant="ghost" size="sm">
+                      <Button variant="ghost" size="sm" onClick={() => setSelectedId(m.id)}>
                         <FileText className="w-4 h-4 mr-2" /> View
                       </Button>
                     </TableCell>
@@ -82,6 +87,77 @@ export default function Manifests() {
           </Table>
         </CardContent>
       </Card>
+
+      <Dialog open={!!selectedId} onOpenChange={(open) => (!open ? setSelectedId(null) : undefined)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Manifest Details</DialogTitle>
+          </DialogHeader>
+          <ScrollArea className="max-h-[70vh] pr-4">
+            {selected ? (
+              <div className="space-y-4 text-sm">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div>
+                    <div className="text-xs uppercase text-muted-foreground">Manifest #</div>
+                    <div className="font-medium">{selected.manifestNumber}</div>
+                  </div>
+                  <div>
+                    <div className="text-xs uppercase text-muted-foreground">Status</div>
+                    <div className="font-medium capitalize">{selected.status}</div>
+                  </div>
+                  <div>
+                    <div className="text-xs uppercase text-muted-foreground">Generated At</div>
+                    <div className="font-medium">
+                      {selected.generatedAt ? new Date(selected.generatedAt).toLocaleString() : "--"}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-xs uppercase text-muted-foreground">Loading Sheet</div>
+                    <div className="font-medium">{selected.loadingSheet?.sheetNumber ?? `LS-${selected.loadingSheetId}`}</div>
+                  </div>
+                </div>
+
+                {selected.loadingSheet && (
+                  <div>
+                    <div className="text-xs uppercase text-muted-foreground">Loading Sheet Details</div>
+                    <div className="mt-2 rounded-lg border border-border p-3 text-sm text-muted-foreground">
+                      Vehicle: <span className="text-foreground">{selected.loadingSheet.vehicleNumber}</span> | Driver:{" "}
+                      <span className="text-foreground">{selected.loadingSheet.driverName}</span> | Destination:{" "}
+                      <span className="text-foreground">{selected.loadingSheet.destination}</span>
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex justify-end">
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      const bodyHtml = `
+                        <div class="grid">
+                          <div><div class="meta">Manifest #</div><div>${selected.manifestNumber}</div></div>
+                          <div><div class="meta">Status</div><div>${selected.status}</div></div>
+                          <div><div class="meta">Generated At</div><div>${selected.generatedAt ? new Date(selected.generatedAt).toLocaleString() : "--"}</div></div>
+                          <div><div class="meta">Loading Sheet</div><div>${selected.loadingSheet?.sheetNumber ?? `LS-${selected.loadingSheetId}`}</div></div>
+                        </div>
+                        ${
+                          selected.loadingSheet
+                            ? `<div class="section"><h2>Loading Sheet</h2><div class="meta">Vehicle: ${selected.loadingSheet.vehicleNumber} | Driver: ${selected.loadingSheet.driverName} | Destination: ${selected.loadingSheet.destination}</div></div>`
+                            : ""
+                        }
+                      `;
+                      openPrintWindow(`Manifest ${selected.manifestNumber}`, bodyHtml);
+                    }}
+                  >
+                    Print
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="text-sm text-muted-foreground">Loading details...</div>
+            )}
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
