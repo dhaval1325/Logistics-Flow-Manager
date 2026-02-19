@@ -1,12 +1,9 @@
-import { Switch, Route, useLocation } from "wouter";
+import { Switch, Route } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Sidebar } from "@/components/Sidebar";
-import { useEffect } from "react";
-import { useAuth } from "@/hooks/use-auth";
-
 import Dashboard from "@/pages/Dashboard";
 import Dockets from "@/pages/Dockets";
 import LoadingSheets from "@/pages/LoadingSheets";
@@ -16,44 +13,8 @@ import PodReview from "@/pages/PodReview";
 import DocketTracker from "@/pages/DocketTracker";
 import AuditLogs from "@/pages/AuditLogs";
 import NotFound from "@/pages/not-found";
-import Login from "@/pages/Login";
-import Register from "@/pages/Register";
 
 function Router() {
-  const { user, isLoading } = useAuth();
-  const [location, setLocation] = useLocation();
-  const isAuthRoute = location === "/login" || location === "/register";
-
-  useEffect(() => {
-    if (!isLoading && !user && !isAuthRoute) {
-      setLocation("/login");
-    }
-  }, [isLoading, user, isAuthRoute, setLocation]);
-
-  useEffect(() => {
-    if (!isLoading && user && isAuthRoute) {
-      setLocation("/");
-    }
-  }, [isLoading, user, isAuthRoute, setLocation]);
-
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="text-sm text-muted-foreground">Loading session...</div>
-      </div>
-    );
-  }
-
-  if (!user) {
-    return (
-      <Switch>
-        <Route path="/login" component={Login} />
-        <Route path="/register" component={Register} />
-        <Route component={Login} />
-      </Switch>
-    );
-  }
-
   return (
     <div className="min-h-screen bg-background flex">
       <Sidebar />

@@ -126,18 +126,20 @@ export function Sidebar() {
 
           {/* Footer */}
           <div className="p-4 border-t border-border">
-            <Button
-              variant="ghost"
-              className={cn(
-                "w-full justify-start gap-3 px-3 py-2.5 text-muted-foreground",
-                isCollapsed ? "lg:justify-center lg:px-2" : ""
-              )}
-              onClick={() => logout.mutate()}
-              disabled={logout.isPending}
-            >
-              <LogOut className="h-5 w-5" />
-              {!isCollapsed && (logout.isPending ? "Signing out..." : "Sign out")}
-            </Button>
+            {user && (
+              <Button
+                variant="ghost"
+                className={cn(
+                  "w-full justify-start gap-3 px-3 py-2.5 text-muted-foreground",
+                  isCollapsed ? "lg:justify-center lg:px-2" : ""
+                )}
+                onClick={() => logout.mutate()}
+                disabled={logout.isPending}
+              >
+                <LogOut className="h-5 w-5" />
+                {!isCollapsed && (logout.isPending ? "Signing out..." : "Sign out")}
+              </Button>
+            )}
             <div className={cn(
               "mt-4 px-3 flex items-center gap-3",
               isCollapsed ? "lg:justify-center lg:px-2" : ""
@@ -148,10 +150,10 @@ export function Sidebar() {
               {!isCollapsed && (
                 <div className="flex flex-col">
                   <span className="text-xs font-semibold text-foreground">
-                    {user?.username ?? "User"}
+                    {user?.username ?? "Guest"}
                   </span>
                   <span className="text-[10px] text-muted-foreground capitalize">
-                    {user?.role ?? "staff"}
+                    {user?.role ?? "access"}
                   </span>
                 </div>
               )}

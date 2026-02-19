@@ -227,12 +227,7 @@ export async function registerRoutes(
     return res.json(sanitizeUser(req.user as any));
   });
 
-  app.use("/api", (req, res, next) => {
-    if (req.path.startsWith("/auth")) {
-      return next();
-    }
-    return requireAuth(req, res, next);
-  });
+  // Auth temporarily disabled. Re-enable by restoring the requireAuth middleware here.
 
   app.get(api.dashboard.get.path, async (_req, res) => {
     const dashboard = await storage.getDashboardStats();
