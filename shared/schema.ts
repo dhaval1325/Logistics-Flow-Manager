@@ -94,6 +94,20 @@ export const pods = pgTable("pods", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+export const auditLogs = pgTable("audit_logs", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id"),
+  username: text("username"),
+  action: text("action").notNull(),
+  entityType: text("entity_type"),
+  entityId: integer("entity_id"),
+  summary: text("summary"),
+  meta: jsonb("meta"),
+  ip: text("ip"),
+  userAgent: text("user_agent"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // === RELATIONS ===
 
 export const docketItemsRelations = relations(docketItems, ({ one }) => ({
@@ -171,6 +185,7 @@ export const insertLoadingSheetDocketSchema = createInsertSchema(loadingSheetDoc
 export const insertManifestSchema = createInsertSchema(manifests).omit({ id: true, generatedAt: true });
 export const insertThcSchema = createInsertSchema(thcs).omit({ id: true, createdAt: true });
 export const insertPodSchema = createInsertSchema(pods).omit({ id: true, createdAt: true, approvedAt: true, approvedBy: true, aiAnalysis: true, rejectionReason: true, status: true });
+export const insertAuditLogSchema = createInsertSchema(auditLogs).omit({ id: true, createdAt: true });
 
 
 // === EXPLICIT TYPES ===
@@ -196,6 +211,8 @@ export type InsertThc = z.infer<typeof insertThcSchema>;
 
 export type Pod = typeof pods.$inferSelect;
 export type InsertPod = z.infer<typeof insertPodSchema>;
+export type AuditLog = typeof auditLogs.$inferSelect;
+export type InsertAuditLog = z.infer<typeof insertAuditLogSchema>;
 
 // Request Types
 export type CreateDocketRequest = InsertDocket & { items: InsertDocketItem[] };

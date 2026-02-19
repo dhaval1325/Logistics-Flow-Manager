@@ -73,6 +73,53 @@ async function geocodeAddress(address: string) {
   return result;
 }
 
+function getRequestIp(req: Request) {
+  const forwarded = req.headers["x-forwarded-for"];
+  if (Array.isArray(forwarded)) return forwarded[0];
+  if (typeof forwarded === "string") return forwarded.split(",")[0]?.trim();
+  return req.socket?.remoteAddress ?? null;
+}
+
+function getUserContext(req: Request) {
+  const user = req.user as { id?: number; username?: string } | undefined;
+  return {
+    userId: user?.id ?? null,
+    username: user?.username ?? null,
+  };
+}
+
+async function logAudit(
+  req: Request,
+  details: {
+    action: string;
+    entityType?: string;
+    entityId?: number | null;
+    summary?: string;
+    meta?: Record<string, any> | null;
+    userId?: number | null;
+    username?: string | null;
+  },
+) {
+  try {
+    const context = getUserContext(req);
+    const userId = details.userId ?? context.userId;
+    const username = details.username ?? context.username;
+    await storage.createAuditLog({
+      userId,
+      username,
+      action: details.action,
+      entityType: details.entityType ?? null,
+      entityId: details.entityId ?? null,
+      summary: details.summary ?? null,
+      meta: details.meta ?? null,
+      ip: getRequestIp(req),
+      userAgent: req.headers["user-agent"] ?? null,
+    });
+  } catch (error) {
+    console.warn("Audit log failed:", error);
+  }
+}
+
 export async function registerRoutes(
   httpServer: Server,
   app: Express
@@ -111,6 +158,15 @@ export async function registerRoutes(
 
       req.login(createdUser, (err) => {
         if (err) return next(err);
+        logAudit(req, {
+          action: "auth.register",
+          entityType: "user",
+          entityId: createdUser.id,
+          summary: `User registered: ${createdUser.username}`,
+          meta: { role: createdUser.role },
+          userId: createdUser.id,
+          username: createdUser.username,
+        });
         return res.status(201).json(sanitizeUser(createdUser));
       });
     } catch (err) {
@@ -138,12 +194,24 @@ export async function registerRoutes(
         if (loginErr) {
           return next(loginErr);
         }
+        logAudit(req, {
+          action: "auth.login",
+          entityType: "user",
+          entityId: user.id,
+          summary: `User logged in: ${user.username}`,
+        });
         return res.json(sanitizeUser(user));
       });
     })(req, res, next);
   });
 
   app.post(api.auth.logout.path, (req, res, next) => {
+    logAudit(req, {
+      action: "auth.logout",
+      entityType: "user",
+      entityId: (req.user as any)?.id ?? null,
+      summary: `User logged out: ${(req.user as any)?.username ?? "unknown"}`,
+    });
     req.logout((err) => {
       if (err) return next(err);
       req.session?.destroy(() => {
@@ -227,6 +295,13 @@ export async function registerRoutes(
       }
 
       const docket = await storage.createDocket(nextInput);
+      logAudit(req, {
+        action: "docket.create",
+        entityType: "docket",
+        entityId: docket.id,
+        summary: `Created docket ${docket.docketNumber}`,
+        meta: { status: docket.status },
+      });
       res.status(201).json(docket);
     } catch (err) {
       if (err instanceof z.ZodError) {
@@ -238,6 +313,13 @@ export async function registerRoutes(
 
   app.patch(api.dockets.updateStatus.path, async (req, res) => {
     const docket = await storage.updateDocketStatus(Number(req.params.id), req.body.status);
+    logAudit(req, {
+      action: "docket.status",
+      entityType: "docket",
+      entityId: docket.id,
+      summary: `Docket ${docket.docketNumber} status updated to ${docket.status}`,
+      meta: { status: docket.status },
+    });
     res.json(docket);
   });
 
@@ -257,11 +339,25 @@ export async function registerRoutes(
   app.post(api.loadingSheets.create.path, async (req, res) => {
     const input = api.loadingSheets.create.input.parse(req.body);
     const sheet = await storage.createLoadingSheet(input);
+    logAudit(req, {
+      action: "loading_sheet.create",
+      entityType: "loading_sheet",
+      entityId: sheet.id,
+      summary: `Created loading sheet ${sheet.sheetNumber}`,
+      meta: { docketIds: input.docketIds },
+    });
     res.status(201).json(sheet);
   });
 
   app.post(api.loadingSheets.finalize.path, async (req, res) => {
     const sheet = await storage.finalizeLoadingSheet(Number(req.params.id));
+    logAudit(req, {
+      action: "loading_sheet.finalize",
+      entityType: "loading_sheet",
+      entityId: sheet.id,
+      summary: `Finalized loading sheet ${sheet.sheetNumber}`,
+      meta: { status: sheet.status },
+    });
     res.json(sheet);
   });
 
@@ -281,6 +377,13 @@ export async function registerRoutes(
   app.post(api.manifests.create.path, async (req, res) => {
     const input = api.manifests.create.input.parse(req.body);
     const manifest = await storage.createManifest(input);
+    logAudit(req, {
+      action: "manifest.create",
+      entityType: "manifest",
+      entityId: manifest.id,
+      summary: `Generated manifest ${manifest.manifestNumber}`,
+      meta: { loadingSheetId: manifest.loadingSheetId },
+    });
     res.status(201).json(manifest);
   });
 
@@ -294,12 +397,26 @@ export async function registerRoutes(
   app.post(api.thcs.create.path, async (req, res) => {
     const input = api.thcs.create.input.parse(req.body);
     const thc = await storage.createThc(input);
+    logAudit(req, {
+      action: "thc.create",
+      entityType: "thc",
+      entityId: thc.id,
+      summary: `Generated THC ${thc.thcNumber}`,
+      meta: { manifestId: thc.manifestId },
+    });
     res.status(201).json(thc);
   });
 
   app.patch(api.thcs.update.path, async (req, res) => {
     const input = api.thcs.update.input.parse(req.body);
     const thc = await storage.updateThc(Number(req.params.id), input);
+    logAudit(req, {
+      action: "thc.update",
+      entityType: "thc",
+      entityId: thc.id,
+      summary: `Updated THC ${thc.thcNumber}`,
+      meta: input,
+    });
     res.json(thc);
   });
 
@@ -313,6 +430,13 @@ export async function registerRoutes(
   app.post(api.pods.create.path, async (req, res) => {
     const input = api.pods.create.input.parse(req.body);
     const pod = await storage.createPod(input);
+    logAudit(req, {
+      action: "pod.create",
+      entityType: "pod",
+      entityId: pod.id,
+      summary: `Created POD for docket ${pod.docketId}`,
+      meta: { docketId: pod.docketId },
+    });
     res.status(201).json(pod);
   });
 
@@ -328,12 +452,26 @@ export async function registerRoutes(
 
     const imageUrl = `/uploads/${file.filename}`;
     const pod = await storage.createPod({ docketId, imageUrl });
+    logAudit(req, {
+      action: "pod.upload",
+      entityType: "pod",
+      entityId: pod.id,
+      summary: `Uploaded POD for docket ${pod.docketId}`,
+      meta: { docketId: pod.docketId, imageUrl },
+    });
     res.status(201).json(pod);
   });
 
   app.post(api.pods.review.path, async (req, res) => {
     const { status, rejectionReason } = api.pods.review.input.parse(req.body);
     const pod = await storage.updatePodReview(Number(req.params.id), status, rejectionReason);
+    logAudit(req, {
+      action: "pod.review",
+      entityType: "pod",
+      entityId: pod.id,
+      summary: `POD review ${status} for docket ${pod.docketId}`,
+      meta: { status, rejectionReason },
+    });
     res.json(pod);
   });
 
@@ -374,6 +512,13 @@ export async function registerRoutes(
       const analysis = JSON.parse(response.choices[0].message.content || "{}");
       
       const updatedPod = await storage.updatePodAnalysis(podId, analysis);
+      logAudit(req, {
+        action: "pod.analyze",
+        entityType: "pod",
+        entityId: updatedPod.id,
+        summary: `POD analyzed for docket ${updatedPod.docketId}`,
+        meta: { recommendedAction: analysis?.recommendedAction ?? null },
+      });
       res.json(updatedPod);
     } catch (error) {
       console.error("AI Analysis failed:", error);
@@ -385,8 +530,23 @@ export async function registerRoutes(
         recommendedAction: "approve"
       };
       const updatedPod = await storage.updatePodAnalysis(podId, simulatedAnalysis);
+      logAudit(req, {
+        action: "pod.analyze",
+        entityType: "pod",
+        entityId: updatedPod.id,
+        summary: `POD analyzed (simulated) for docket ${updatedPod.docketId}`,
+        meta: { simulated: true },
+      });
       res.json(updatedPod);
     }
+  });
+
+  // Audit Logs
+  app.get(api.auditLogs.list.path, async (req, res) => {
+    const input = api.auditLogs.list.input?.safeParse(req.query);
+    const filters = input?.success ? input.data : undefined;
+    const logs = await storage.getAuditLogs(filters);
+    res.json(logs);
   });
 
   return httpServer;

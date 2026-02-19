@@ -7,6 +7,7 @@ import {
   ClipboardCheck, 
   Activity,
   LogOut,
+  ClipboardList,
   ChevronLeft,
   ChevronRight,
   Menu,
@@ -25,6 +26,7 @@ const navItems = [
   { href: "/manifests", label: "Manifests", icon: FileText },
   { href: "/thc", label: "THC Management", icon: ClipboardCheck },
   { href: "/pod", label: "POD Review", icon: ClipboardCheck },
+  { href: "/audit-logs", label: "Audit Logs", icon: ClipboardList },
 ];
 
 export function Sidebar() {

@@ -6,6 +6,7 @@ import {
   insertLoadingSheetSchema, 
   insertThcSchema, 
   insertPodSchema,
+  auditLogs,
   dockets,
   docketItems,
   loadingSheets,
@@ -69,6 +70,20 @@ const trackerSchema = z.object({
     })
     .nullable(),
   events: z.array(trackerEventSchema),
+});
+
+const auditLogSchema = z.object({
+  id: z.number(),
+  userId: z.number().nullable(),
+  username: z.string().nullable(),
+  action: z.string(),
+  entityType: z.string().nullable(),
+  entityId: z.number().nullable(),
+  summary: z.string().nullable(),
+  meta: z.record(z.any()).nullable(),
+  ip: z.string().nullable(),
+  userAgent: z.string().nullable(),
+  createdAt: z.string(),
 });
 
 const authUserSchema = z.object({
@@ -314,6 +329,26 @@ export const api = {
         404: errorSchemas.notFound,
       },
     }
+  },
+  auditLogs: {
+    list: {
+      method: "GET" as const,
+      path: "/api/audit-logs" as const,
+      input: z
+        .object({
+          action: z.string().optional(),
+          entityType: z.string().optional(),
+          entityId: z.coerce.number().optional(),
+          userId: z.coerce.number().optional(),
+          search: z.string().optional(),
+          limit: z.coerce.number().min(1).max(200).optional(),
+          offset: z.coerce.number().min(0).optional(),
+        })
+        .optional(),
+      responses: {
+        200: z.array(auditLogSchema),
+      },
+    },
   },
 };
 
