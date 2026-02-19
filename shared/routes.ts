@@ -55,6 +55,19 @@ const trackerSchema = z.object({
   docketId: z.number(),
   docketNumber: z.string(),
   status: z.string(),
+  geofence: z
+    .object({
+      lat: z.number(),
+      lng: z.number(),
+      radiusMeters: z.number(),
+    })
+    .nullable(),
+  currentLocation: z
+    .object({
+      lat: z.number(),
+      lng: z.number(),
+    })
+    .nullable(),
   events: z.array(trackerEventSchema),
 });
 

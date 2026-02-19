@@ -246,10 +246,37 @@ export class DatabaseStorage implements IStorage {
       },
     ];
 
+    const geofenceLat = docket.geofenceLat != null ? Number(docket.geofenceLat) : null;
+    const geofenceLng = docket.geofenceLng != null ? Number(docket.geofenceLng) : null;
+    const geofenceRadiusKm = docket.geofenceRadiusKm != null ? Number(docket.geofenceRadiusKm) : null;
+    const currentLat = docket.currentLat != null ? Number(docket.currentLat) : null;
+    const currentLng = docket.currentLng != null ? Number(docket.currentLng) : null;
+
+    const geofence =
+      geofenceLat != null &&
+      !Number.isNaN(geofenceLat) &&
+      geofenceLng != null &&
+      !Number.isNaN(geofenceLng) &&
+      geofenceRadiusKm != null &&
+      !Number.isNaN(geofenceRadiusKm)
+        ? {
+            lat: geofenceLat,
+            lng: geofenceLng,
+            radiusMeters: geofenceRadiusKm * 1000,
+          }
+        : null;
+
+    const currentLocation =
+      currentLat != null && !Number.isNaN(currentLat) && currentLng != null && !Number.isNaN(currentLng)
+        ? { lat: currentLat, lng: currentLng }
+        : null;
+
     return {
       docketId: docket.id,
       docketNumber: docket.docketNumber,
       status: docket.status,
+      geofence,
+      currentLocation,
       events,
     };
   }
@@ -639,10 +666,37 @@ class MemoryStorage implements IStorage {
       },
     ];
 
+    const geofenceLat = docket.geofenceLat != null ? Number(docket.geofenceLat) : null;
+    const geofenceLng = docket.geofenceLng != null ? Number(docket.geofenceLng) : null;
+    const geofenceRadiusKm = docket.geofenceRadiusKm != null ? Number(docket.geofenceRadiusKm) : null;
+    const currentLat = docket.currentLat != null ? Number(docket.currentLat) : null;
+    const currentLng = docket.currentLng != null ? Number(docket.currentLng) : null;
+
+    const geofence =
+      geofenceLat != null &&
+      !Number.isNaN(geofenceLat) &&
+      geofenceLng != null &&
+      !Number.isNaN(geofenceLng) &&
+      geofenceRadiusKm != null &&
+      !Number.isNaN(geofenceRadiusKm)
+        ? {
+            lat: geofenceLat,
+            lng: geofenceLng,
+            radiusMeters: geofenceRadiusKm * 1000,
+          }
+        : null;
+
+    const currentLocation =
+      currentLat != null && !Number.isNaN(currentLat) && currentLng != null && !Number.isNaN(currentLng)
+        ? { lat: currentLat, lng: currentLng }
+        : null;
+
     return {
       docketId: docket.id,
       docketNumber: docket.docketNumber,
       status: docket.status,
+      geofence,
+      currentLocation,
       events,
     };
   }
@@ -662,6 +716,11 @@ class MemoryStorage implements IStorage {
       specialInstructions: fields.specialInstructions ?? null,
       totalWeight: fields.totalWeight ?? null,
       totalPackages: fields.totalPackages ?? null,
+      geofenceLat: fields.geofenceLat ?? null,
+      geofenceLng: fields.geofenceLng ?? null,
+      geofenceRadiusKm: fields.geofenceRadiusKm ?? null,
+      currentLat: fields.currentLat ?? null,
+      currentLng: fields.currentLng ?? null,
       createdAt: new Date(),
     };
 

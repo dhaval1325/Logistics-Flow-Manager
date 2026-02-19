@@ -1,15 +1,19 @@
 import { useEffect, useMemo, useState } from "react";
-import { Activity, ClipboardList, Truck } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Activity, Check, ChevronsUpDown, ClipboardList, MapPin, Truck } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+} from "@/components/ui/command";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useDockets, useDocketTracker } from "@/hooks/use-logistics";
+import { cn } from "@/lib/utils";
+import { MapContainer, TileLayer, Circle, CircleMarker, Polyline } from "react-leaflet";
 
 function formatTimestamp(value: string | null) {
   if (!value) return "Pending";
@@ -37,9 +41,18 @@ function renderMeta(meta?: Record<string, any>) {
   return null;
 }
 
+function getZoom(radiusMeters?: number | null) {
+  if (!radiusMeters) return 11;
+  if (radiusMeters > 50000) return 7;
+  if (radiusMeters > 20000) return 9;
+  if (radiusMeters > 10000) return 10;
+  return 12;
+}
+
 export default function DocketTracker() {
   const { data: dockets, isLoading: loadingDockets } = useDockets();
   const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [open, setOpen] = useState(false);
 
   useEffect(() => {
     if (!selectedId && dockets && dockets.length > 0) {
@@ -48,8 +61,26 @@ export default function DocketTracker() {
   }, [dockets, selectedId]);
 
   const trackerQuery = useDocketTracker(selectedId ?? 0);
-  const events = trackerQuery.data?.events ?? [];
+  const fallbackEvents = useMemo(
+    () => [
+      { key: "docket_created", label: "Docket created", timestamp: null },
+      { key: "loading_sheet_created", label: "Loading sheet created", timestamp: null },
+      { key: "manifest_created", label: "Manifest created", timestamp: null },
+      { key: "thc_created", label: "THC created", timestamp: null },
+      { key: "pod_uploaded", label: "POD uploaded", timestamp: null },
+    ],
+    [],
+  );
+  const events = trackerQuery.data?.events ?? (selectedId ? fallbackEvents : []);
   const docketStatus = trackerQuery.data?.status ?? "—";
+  const geofence = trackerQuery.data?.geofence ?? null;
+  const currentLocation = trackerQuery.data?.currentLocation ?? null;
+  const defaultCenter: [number, number] = [40.7128, -74.006];
+  const center: [number, number] = geofence
+    ? [geofence.lat, geofence.lng]
+    : currentLocation
+      ? [currentLocation.lat, currentLocation.lng]
+      : defaultCenter;
 
   const docketOptions = useMemo(() => {
     if (!dockets) return [];
@@ -58,6 +89,7 @@ export default function DocketTracker() {
       label: `${docket.docketNumber} • ${docket.senderName} → ${docket.receiverName}`,
     }));
   }, [dockets]);
+  const selectedOption = docketOptions.find((option) => option.id === selectedId) ?? null;
 
   return (
     <div className="space-y-6">
@@ -80,22 +112,50 @@ export default function DocketTracker() {
             <CardTitle className="text-lg">Select docket</CardTitle>
           </div>
           <div className="w-full lg:w-96">
-            <Select
-              value={selectedId ? String(selectedId) : undefined}
-              onValueChange={(value) => setSelectedId(Number(value))}
-              disabled={loadingDockets || docketOptions.length === 0}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder={loadingDockets ? "Loading dockets..." : "Choose a docket"} />
-              </SelectTrigger>
-              <SelectContent>
-                {docketOptions.map((option) => (
-                  <SelectItem key={option.id} value={String(option.id)}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Popover open={open} onOpenChange={setOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  role="combobox"
+                  aria-expanded={open}
+                  className="w-full justify-between"
+                  disabled={loadingDockets || docketOptions.length === 0}
+                >
+                  {selectedOption
+                    ? selectedOption.label
+                    : loadingDockets
+                      ? "Loading dockets..."
+                      : "Choose a docket"}
+                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-60" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                <Command>
+                  <CommandInput placeholder="Search dockets..." />
+                  <CommandEmpty>No dockets found.</CommandEmpty>
+                  <CommandGroup>
+                    {docketOptions.map((option) => (
+                      <CommandItem
+                        key={option.id}
+                        value={`${option.label} ${option.id}`}
+                        onSelect={() => {
+                          setSelectedId(option.id);
+                          setOpen(false);
+                        }}
+                      >
+                        <Check
+                          className={cn(
+                            "mr-2 h-4 w-4",
+                            selectedId === option.id ? "opacity-100" : "opacity-0",
+                          )}
+                        />
+                        <span className="truncate">{option.label}</span>
+                      </CommandItem>
+                    ))}
+                  </CommandGroup>
+                </Command>
+              </PopoverContent>
+            </Popover>
           </div>
         </CardHeader>
         <CardContent>
@@ -142,11 +202,89 @@ export default function DocketTracker() {
                   );
                 })}
                 {events.length === 0 && (
-                  <div className="text-sm text-muted-foreground">No tracker data available.</div>
+                  <div className="text-sm text-muted-foreground">
+                    No docket selected yet. Choose one from the dropdown.
+                  </div>
                 )}
               </div>
             </div>
           )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="flex items-center gap-2">
+          <MapPin className="h-5 w-5 text-primary" />
+          <CardTitle className="text-lg">Live Map & Geofence</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {!geofence && !currentLocation && (
+            <div className="text-sm text-muted-foreground">
+              No tracking coordinates saved for this docket yet. Add geofence and current location
+              values when creating or editing the docket.
+            </div>
+          )}
+          <div className="h-[360px] w-full overflow-hidden rounded-xl border border-border">
+            <MapContainer
+              key={`${selectedId}-${center[0]}-${center[1]}`}
+              center={center}
+              zoom={getZoom(geofence?.radiusMeters ?? null)}
+              scrollWheelZoom
+              style={{ height: "100%", width: "100%" }}
+            >
+              <TileLayer
+                attribution='&copy; OpenStreetMap contributors'
+                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+              />
+              {geofence && (
+                <Circle
+                  center={[geofence.lat, geofence.lng]}
+                  radius={geofence.radiusMeters}
+                  pathOptions={{ color: "#2563eb", fillColor: "#93c5fd", fillOpacity: 0.2 }}
+                />
+              )}
+              {currentLocation && (
+                <CircleMarker
+                  center={[currentLocation.lat, currentLocation.lng]}
+                  radius={6}
+                  pathOptions={{ color: "#16a34a", fillColor: "#22c55e", fillOpacity: 0.9 }}
+                />
+              )}
+              {geofence && currentLocation && (
+                <Polyline
+                  positions={[
+                    [currentLocation.lat, currentLocation.lng],
+                    [geofence.lat, geofence.lng],
+                  ]}
+                  pathOptions={{ color: "#0f172a", dashArray: "6 6" }}
+                />
+              )}
+            </MapContainer>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm text-muted-foreground">
+            <div>
+              <div className="text-xs uppercase tracking-wide">Geofence</div>
+              <div className="text-foreground font-medium">
+                {geofence
+                  ? `${geofence.lat.toFixed(4)}, ${geofence.lng.toFixed(4)}`
+                  : "Not set"}
+              </div>
+            </div>
+            <div>
+              <div className="text-xs uppercase tracking-wide">Radius</div>
+              <div className="text-foreground font-medium">
+                {geofence ? `${(geofence.radiusMeters / 1000).toFixed(1)} km` : "—"}
+              </div>
+            </div>
+            <div>
+              <div className="text-xs uppercase tracking-wide">Current Location</div>
+              <div className="text-foreground font-medium">
+                {currentLocation
+                  ? `${currentLocation.lat.toFixed(4)}, ${currentLocation.lng.toFixed(4)}`
+                  : "Not set"}
+              </div>
+            </div>
+          </div>
         </CardContent>
       </Card>
     </div>
