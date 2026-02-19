@@ -345,74 +345,9 @@ function CreateDocketForm({ onSuccess }: { onSuccess: () => void }) {
           ))}
         </div>
 
-        <div className="space-y-4 rounded-lg border border-dashed border-border p-4">
-          <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">
-            Geofence & Tracking (Optional)
-          </h3>
-          <div className="grid grid-cols-2 gap-4">
-            <FormField
-              control={form.control}
-              name="geofenceLat"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Geofence Latitude</FormLabel>
-                  <FormControl><Input type="number" step="0.0001" placeholder="e.g. 19.0760" {...field} /></FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="geofenceLng"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Geofence Longitude</FormLabel>
-                  <FormControl><Input type="number" step="0.0001" placeholder="e.g. 72.8777" {...field} /></FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <FormField
-              control={form.control}
-              name="geofenceRadiusKm"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Geofence Radius (km)</FormLabel>
-                  <FormControl><Input type="number" step="0.1" placeholder="e.g. 5" {...field} /></FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <div className="text-xs text-muted-foreground flex items-center">
-              Set the geofence center + radius to highlight on the tracker map.
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <FormField
-              control={form.control}
-              name="currentLat"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Current Latitude</FormLabel>
-                  <FormControl><Input type="number" step="0.0001" placeholder="e.g. 19.0896" {...field} /></FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="currentLng"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Current Longitude</FormLabel>
-                  <FormControl><Input type="number" step="0.0001" placeholder="e.g. 72.8656" {...field} /></FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-          </div>
+        <div className="rounded-lg border border-dashed border-border p-4 text-sm text-muted-foreground">
+          Geofence and current location coordinates are auto-filled from sender and receiver
+          addresses when you create the docket.
         </div>
 
         <div className="flex justify-end gap-2 pt-4 border-t">
