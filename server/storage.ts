@@ -43,6 +43,16 @@ export interface IStorage {
     events: { key: string; label: string; timestamp: string | null; meta?: Record<string, any> }[];
   } | undefined>;
   createDocket(docket: InsertDocket & { items: InsertDocketItem[] }): Promise<Docket>;
+  updateDocketTracking(
+    id: number,
+    fields: {
+      geofenceLat?: string | null;
+      geofenceLng?: string | null;
+      geofenceRadiusKm?: string | null;
+      currentLat?: string | null;
+      currentLng?: string | null;
+    },
+  ): Promise<Docket>;
   updateDocketStatus(id: number, status: string): Promise<Docket>;
 
   // Loading Sheets
@@ -362,6 +372,31 @@ export class DatabaseStorage implements IStorage {
       );
     }
 
+    return docket;
+  }
+
+  async updateDocketTracking(
+    id: number,
+    fields: {
+      geofenceLat?: string | null;
+      geofenceLng?: string | null;
+      geofenceRadiusKm?: string | null;
+      currentLat?: string | null;
+      currentLng?: string | null;
+    },
+  ): Promise<Docket> {
+    const updates: Partial<InsertDocket> = {};
+    if ("geofenceLat" in fields) updates.geofenceLat = fields.geofenceLat ?? null;
+    if ("geofenceLng" in fields) updates.geofenceLng = fields.geofenceLng ?? null;
+    if ("geofenceRadiusKm" in fields) updates.geofenceRadiusKm = fields.geofenceRadiusKm ?? null;
+    if ("currentLat" in fields) updates.currentLat = fields.currentLat ?? null;
+    if ("currentLng" in fields) updates.currentLng = fields.currentLng ?? null;
+
+    const [docket] = await this.db
+      .update(dockets)
+      .set(updates)
+      .where(eq(dockets.id, id))
+      .returning();
     return docket;
   }
 
@@ -921,6 +956,31 @@ class MemoryStorage implements IStorage {
       this.docketItems.push(...createdItems);
     }
 
+    return docket;
+  }
+
+  async updateDocketTracking(
+    id: number,
+    fields: {
+      geofenceLat?: string | null;
+      geofenceLng?: string | null;
+      geofenceRadiusKm?: string | null;
+      currentLat?: string | null;
+      currentLng?: string | null;
+    },
+  ): Promise<Docket> {
+    const docket = this.dockets.find((d) => d.id === id);
+    if (!docket) {
+      const error = new Error("Docket not found");
+      (error as any).status = 404;
+      throw error;
+    }
+
+    if ("geofenceLat" in fields) docket.geofenceLat = fields.geofenceLat ?? null;
+    if ("geofenceLng" in fields) docket.geofenceLng = fields.geofenceLng ?? null;
+    if ("geofenceRadiusKm" in fields) docket.geofenceRadiusKm = fields.geofenceRadiusKm ?? null;
+    if ("currentLat" in fields) docket.currentLat = fields.currentLat ?? null;
+    if ("currentLng" in fields) docket.currentLng = fields.currentLng ?? null;
     return docket;
   }
 

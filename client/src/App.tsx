@@ -1,4 +1,5 @@
 import { Switch, Route } from "wouter";
+import { useEffect, useState } from "react";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -13,7 +14,9 @@ import ThcManagement from "@/pages/ThcManagement";
 import PodReview from "@/pages/PodReview";
 import DocketTracker from "@/pages/DocketTracker";
 import AuditLogs from "@/pages/AuditLogs";
+import Login from "@/pages/Login";
 import NotFound from "@/pages/not-found";
+import { getUiAuth, onUiAuthChange } from "@/lib/ui-auth";
 
 function Router() {
   return (
@@ -42,11 +45,23 @@ function Router() {
 }
 
 function App() {
+  const [isAuthed, setIsAuthed] = useState(() => getUiAuth());
+
+  useEffect(() => {
+    const handleAuthChange = () => setIsAuthed(getUiAuth());
+    const cleanup = onUiAuthChange(handleAuthChange);
+    window.addEventListener("storage", handleAuthChange);
+    return () => {
+      cleanup();
+      window.removeEventListener("storage", handleAuthChange);
+    };
+  }, []);
+
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <Toaster />
-        <Router />
+        {isAuthed ? <Router /> : <Login onLogin={() => setIsAuthed(true)} />}
       </TooltipProvider>
     </QueryClientProvider>
   );

@@ -15,18 +15,36 @@ const geocodeCache = new Map<string, { lat: number; lng: number } | null>();
 let lastGeocodeAt = 0;
 
 function normalizeAddress(value?: string | null) {
-  return value?.trim() ?? "";
+  return value?.replace(/\s+/g, " ").trim() ?? "";
 }
 
-async function geocodeAddress(address: string) {
+function buildGeocodeQueries(address: string) {
   const normalized = normalizeAddress(address);
-  if (!normalized) return null;
+  if (!normalized) return [];
+
+  const queries = new Set<string>();
+  queries.add(normalized);
+
+  const country = process.env.GEOCODE_DEFAULT_COUNTRY?.trim();
+  if (country && !normalized.toLowerCase().includes(country.toLowerCase())) {
+    queries.add(`${normalized}, ${country}`);
+  }
+
+  const parts = normalized.split(",").map((part) => part.trim()).filter(Boolean);
+  if (parts.length > 2) {
+    queries.add(parts.slice(1).join(", "));
+    if (parts.length > 3) {
+      queries.add(parts.slice(2).join(", "));
+    }
+  }
+
+  return Array.from(queries);
+}
+
+async function fetchGeocode(query: string) {
   if (typeof fetch !== "function") {
     console.warn("Geocode skipped: fetch is not available in this runtime.");
     return null;
-  }
-  if (geocodeCache.has(normalized)) {
-    return geocodeCache.get(normalized) ?? null;
   }
 
   const now = Date.now();
@@ -37,10 +55,15 @@ async function geocodeAddress(address: string) {
   lastGeocodeAt = Date.now();
 
   const url = new URL("https://nominatim.openstreetmap.org/search");
-  url.searchParams.set("q", normalized);
-  url.searchParams.set("format", "json");
+  url.searchParams.set("q", query);
+  url.searchParams.set("format", "jsonv2");
   url.searchParams.set("limit", "1");
   url.searchParams.set("addressdetails", "0");
+
+  const countryCodes = process.env.GEOCODE_COUNTRY_CODE?.trim();
+  if (countryCodes) {
+    url.searchParams.set("countrycodes", countryCodes);
+  }
 
   const userAgent =
     process.env.GEOCODE_USER_AGENT ?? "LogisticsFlowManager/1.0 (self-hosted)";
@@ -59,18 +82,34 @@ async function geocodeAddress(address: string) {
   const data = (await response.json()) as Array<{ lat: string; lon: string }>;
   const first = data[0];
   if (!first) {
-    geocodeCache.set(normalized, null);
     return null;
   }
 
   const result = { lat: Number(first.lat), lng: Number(first.lon) };
   if (Number.isNaN(result.lat) || Number.isNaN(result.lng)) {
-    geocodeCache.set(normalized, null);
     return null;
   }
 
-  geocodeCache.set(normalized, result);
   return result;
+}
+
+async function geocodeAddress(address: string) {
+  const queries = buildGeocodeQueries(address);
+  if (!queries.length) return null;
+
+  for (const query of queries) {
+    if (geocodeCache.has(query)) {
+      const cached = geocodeCache.get(query);
+      if (cached) return cached;
+      continue;
+    }
+
+    const result = await fetchGeocode(query);
+    geocodeCache.set(query, result);
+    if (result) return result;
+  }
+
+  return null;
 }
 
 function getRequestIp(req: Request) {
@@ -249,7 +288,53 @@ export async function registerRoutes(
   });
 
   app.get(api.dockets.tracker.path, async (req, res) => {
-    const tracker = await storage.getDocketTracker(Number(req.params.id));
+    const docketId = Number(req.params.id);
+    const docket = await storage.getDocket(docketId);
+    if (!docket) return res.status(404).json({ message: "Docket not found" });
+
+    const updates: {
+      geofenceLat?: string | null;
+      geofenceLng?: string | null;
+      geofenceRadiusKm?: string | null;
+      currentLat?: string | null;
+      currentLng?: string | null;
+    } = {};
+
+    const missingGeofence = docket.geofenceLat == null || docket.geofenceLng == null;
+    const missingCurrent = docket.currentLat == null || docket.currentLng == null;
+
+    if (missingGeofence) {
+      try {
+        const geofence = await geocodeAddress(docket.receiverAddress);
+        if (geofence) {
+          updates.geofenceLat = String(geofence.lat);
+          updates.geofenceLng = String(geofence.lng);
+          if (docket.geofenceRadiusKm == null) {
+            updates.geofenceRadiusKm = "5";
+          }
+        }
+      } catch (error) {
+        console.warn("Geofence geocode failed:", error);
+      }
+    }
+
+    if (missingCurrent) {
+      try {
+        const current = await geocodeAddress(docket.senderAddress);
+        if (current) {
+          updates.currentLat = String(current.lat);
+          updates.currentLng = String(current.lng);
+        }
+      } catch (error) {
+        console.warn("Current location geocode failed:", error);
+      }
+    }
+
+    if (Object.keys(updates).length) {
+      await storage.updateDocketTracking(docketId, updates);
+    }
+
+    const tracker = await storage.getDocketTracker(docketId);
     if (!tracker) return res.status(404).json({ message: "Docket not found" });
     res.json(tracker);
   });

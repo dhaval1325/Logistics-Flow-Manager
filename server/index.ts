@@ -1,3 +1,4 @@
+import "dotenv/config";
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupAuth } from "./auth";
@@ -34,6 +35,11 @@ app.use(
 app.use(express.urlencoded({ extended: false }));
 app.use("/uploads", express.static(uploadsDir));
 setupAuth(app);
+// Auth is UI-only for now. Allow API access without session checks.
+app.use("/api", (_req, _res, next) => {
+  (_req as any).isAuthenticated = () => true;
+  next();
+});
 
 export function log(message: string, source = "express") {
   const formattedTime = new Date().toLocaleTimeString("en-US", {

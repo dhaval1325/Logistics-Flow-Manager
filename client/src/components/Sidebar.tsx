@@ -9,23 +9,14 @@ import {
   ClipboardList,
   ChevronLeft,
   ChevronRight,
+  LogOut,
   Menu,
   X
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
-
-const navItems = [
-  { href: "/", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/dockets", label: "Dockets", icon: Package },
-  { href: "/tracker", label: "Docket Tracker", icon: Activity },
-  { href: "/loading-sheets", label: "Loading Sheets", icon: Truck },
-  { href: "/manifests", label: "Manifests", icon: FileText },
-  { href: "/thc", label: "THC Management", icon: ClipboardCheck },
-  { href: "/pod", label: "POD Review", icon: ClipboardCheck },
-  { href: "/audit-logs", label: "Audit Logs", icon: ClipboardList },
-];
+import { clearUiAuth, getUiUser } from "@/lib/ui-auth";
 
 export function Sidebar() {
   const [location] = useLocation();
@@ -34,8 +25,33 @@ export function Sidebar() {
     if (typeof window === "undefined") return false;
     return localStorage.getItem("sidebar-collapsed") === "true";
   });
-  const initials = "LF";
+  const displayName = getUiUser();
+  const initials = displayName
+    .split(" ")
+    .filter(Boolean)
+    .map((part) => part[0]?.toUpperCase())
+    .slice(0, 2)
+    .join("") || "LF";
   const isCollapsed = collapsed;
+  const navItems = [
+    { href: "/", label: "Dashboard", icon: LayoutDashboard },
+    { href: "/dockets", label: "Dockets", icon: Package },
+    { href: "/tracker", label: "Docket Tracker", icon: Activity },
+    { href: "/loading-sheets", label: "Loading Sheets", icon: Truck },
+    { href: "/manifests", label: "Manifests", icon: FileText },
+    { href: "/thc", label: "THC Management", icon: ClipboardCheck },
+    { href: "/pod", label: "POD Review", icon: ClipboardCheck },
+    { href: "/audit-logs", label: "Audit Logs", icon: ClipboardList },
+    {
+      href: "/signout",
+      label: "Sign out",
+      icon: LogOut,
+      onClick: () => {
+        clearUiAuth();
+        window.location.href = "/";
+      },
+    },
+  ];
 
   useEffect(() => {
     if (typeof document === "undefined") return;
@@ -83,19 +99,35 @@ export function Sidebar() {
           {/* Nav Links */}
           <nav className="flex-1 px-4 py-4 space-y-1 overflow-y-auto">
             {navItems.map((item) => {
-              const isActive = location === item.href;
+              const isActive = !item.onClick && location === item.href;
+              const baseClasses = cn(
+                "relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 group",
+                isCollapsed ? "lg:justify-center lg:px-2" : "",
+                isActive 
+                  ? "bg-[var(--accent-strong)] text-white shadow-sm shadow-black/5" 
+                  : "text-[var(--sidebar-muted)] hover:bg-[var(--sidebar-hover)] hover:text-[var(--sidebar-text)]"
+              );
+              const iconClasses = cn(
+                "h-5 w-5 transition-colors",
+                isActive ? "text-white" : "text-[var(--sidebar-muted)] group-hover:text-[var(--sidebar-text)]"
+              );
+              if (item.onClick) {
+                return (
+                  <button
+                    key={item.label}
+                    type="button"
+                    onClick={item.onClick}
+                    className={cn(baseClasses, "w-full text-left")}
+                    title={item.label}
+                  >
+                    <item.icon className={iconClasses} />
+                    {!isCollapsed && item.label}
+                  </button>
+                );
+              }
               return (
-                <Link key={item.href} href={item.href} className={cn(
-                  "relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 group",
-                  isCollapsed ? "lg:justify-center lg:px-2" : "",
-                  isActive 
-                    ? "bg-[var(--accent-strong)] text-white shadow-sm shadow-black/5" 
-                    : "text-[var(--sidebar-muted)] hover:bg-[var(--sidebar-hover)] hover:text-[var(--sidebar-text)]"
-                )} title={item.label}>
-                  <item.icon className={cn(
-                    "h-5 w-5 transition-colors",
-                    isActive ? "text-white" : "text-[var(--sidebar-muted)] group-hover:text-[var(--sidebar-text)]"
-                  )} />
+                <Link key={item.href} href={item.href} className={baseClasses} title={item.label}>
+                  <item.icon className={iconClasses} />
                   {!isCollapsed && item.label}
                 </Link>
               );
@@ -121,6 +153,21 @@ export function Sidebar() {
               )}
               {!isCollapsed && "Collapse"}
             </button>
+            <button
+              type="button"
+              onClick={() => {
+                clearUiAuth();
+                window.location.href = "/";
+              }}
+              className={cn(
+                "mb-2 flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                isCollapsed ? "lg:justify-center lg:px-2" : "",
+                "text-[var(--sidebar-muted)] hover:bg-[var(--sidebar-hover)] hover:text-[var(--sidebar-text)]"
+              )}
+            >
+              <LogOut className="h-4 w-4" />
+              {!isCollapsed && "Sign out"}
+            </button>
             <div className={cn(
               "mt-4 px-3 flex items-center gap-3",
               isCollapsed ? "lg:justify-center lg:px-2" : ""
@@ -131,7 +178,7 @@ export function Sidebar() {
               {!isCollapsed && (
                 <div className="flex flex-col">
                   <span className="text-xs font-semibold text-[var(--sidebar-text)]">
-                    Guest
+                    {displayName}
                   </span>
                   <span className="text-[10px] text-[var(--sidebar-muted)] capitalize">
                     Access
