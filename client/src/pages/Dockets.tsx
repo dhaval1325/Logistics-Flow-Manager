@@ -26,6 +26,11 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { StatusBadge } from "@/components/StatusBadge";
 import { Card, CardContent } from "@/components/ui/card";
 
+const itemSchema = insertDocketItemSchema.extend({
+  weight: z.coerce.number(),
+  quantity: z.coerce.number(),
+});
+
 // Extended schema for the form including items
 const formSchema = insertDocketSchema.extend({
   docketNumber: z.string().min(1, "Required"),
@@ -33,7 +38,7 @@ const formSchema = insertDocketSchema.extend({
   senderAddress: z.string().min(1, "Required"),
   receiverName: z.string().min(1, "Required"),
   receiverAddress: z.string().min(1, "Required"),
-  items: z.array(insertDocketItemSchema).min(1, "Add at least one item"),
+  items: z.array(itemSchema).min(1, "Add at least one item"),
   totalWeight: z.coerce.number(), // Coerce from input string
   totalPackages: z.coerce.number(),
 });

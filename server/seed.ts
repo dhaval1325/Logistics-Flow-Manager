@@ -5,6 +5,9 @@ import { dockets, docketItems, loadingSheets, loadingSheetDockets, manifests, th
 
 async function seed() {
   console.log("Seeding database...");
+  if (!db) {
+    throw new Error("DATABASE_URL must be set to seed the database.");
+  }
 
   // clear existing data
   await db.delete(pods);
@@ -82,9 +85,7 @@ async function seed() {
 
   // Create Manifest from Loading Sheet
   const manifest = await storage.createManifest({
-    manifestNumber: "MAN-2001",
     loadingSheetId: sheet.id,
-    status: "generated"
   });
 
   // Create THC for Manifest
@@ -103,7 +104,6 @@ async function seed() {
   await storage.createPod({
     docketId: docket3.id,
     imageUrl: "https://placehold.co/600x400?text=POD+Image", // Placeholder for demo
-    status: "pending_review"
   });
 
   console.log("Seeding complete!");

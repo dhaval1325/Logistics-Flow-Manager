@@ -1,5 +1,5 @@
 
-import type { Express } from "express";
+import type { Express, Request } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { api } from "@shared/routes";
@@ -21,7 +21,7 @@ export async function registerRoutes(
   const upload = multer({
     storage: multer.diskStorage({
       destination: uploadsDir,
-      filename: (_req, file, cb) => {
+      filename: (_req: Request, file: Express.Multer.File, cb: (error: Error | null, filename: string) => void) => {
         const ext = path.extname(file.originalname || "");
         const name = `${Date.now()}-${Math.random().toString(36).slice(2)}${ext}`;
         cb(null, name);
