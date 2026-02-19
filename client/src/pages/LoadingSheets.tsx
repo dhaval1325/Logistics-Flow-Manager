@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useDockets, useLoadingSheets, useCreateLoadingSheet } from "@/hooks/use-logistics";
+import { useDockets, useLoadingSheets, useCreateLoadingSheet, useFinalizeLoadingSheet } from "@/hooks/use-logistics";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { 
@@ -31,6 +31,8 @@ type FormData = z.infer<typeof formSchema>;
 export default function LoadingSheets() {
   const { data: sheets, isLoading } = useLoadingSheets();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const { mutate: finalizeSheet, isPending: isFinalizing } = useFinalizeLoadingSheet();
+  const [finalizingId, setFinalizingId] = useState<number | null>(null);
 
   return (
     <div className="space-y-6">
@@ -66,18 +68,19 @@ export default function LoadingSheets() {
                 <TableHead>Destination</TableHead>
                 <TableHead>Date</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead>Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="h-32 text-center">
+                  <TableCell colSpan={7} className="h-32 text-center">
                     <Loader2 className="w-6 h-6 animate-spin mx-auto text-primary" />
                   </TableCell>
                 </TableRow>
               ) : sheets?.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="h-32 text-center text-muted-foreground">
+                  <TableCell colSpan={7} className="h-32 text-center text-muted-foreground">
                     No loading sheets yet.
                   </TableCell>
                 </TableRow>
@@ -90,6 +93,24 @@ export default function LoadingSheets() {
                     <TableCell>{sheet.destination}</TableCell>
                     <TableCell>{new Date(sheet.createdAt!).toLocaleDateString()}</TableCell>
                     <TableCell><StatusBadge status={sheet.status} /></TableCell>
+                    <TableCell>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={sheet.status === "finalized" || (isFinalizing && finalizingId === sheet.id)}
+                        onClick={() => {
+                          setFinalizingId(sheet.id);
+                          finalizeSheet(sheet.id, {
+                            onSettled: () => setFinalizingId(null),
+                          });
+                        }}
+                      >
+                        {isFinalizing && finalizingId === sheet.id ? (
+                          <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                        ) : null}
+                        Finalize
+                      </Button>
+                    </TableCell>
                   </TableRow>
                 ))
               )}

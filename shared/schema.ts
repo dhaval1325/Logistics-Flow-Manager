@@ -160,7 +160,7 @@ export const podsRelations = relations(pods, ({ one }) => ({
 
 export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true });
 export const insertDocketSchema = createInsertSchema(dockets).omit({ id: true, createdAt: true });
-export const insertDocketItemSchema = createInsertSchema(docketItems).omit({ id: true });
+export const insertDocketItemSchema = createInsertSchema(docketItems).omit({ id: true, docketId: true });
 export const insertLoadingSheetSchema = createInsertSchema(loadingSheets).omit({ id: true, createdAt: true });
 export const insertLoadingSheetDocketSchema = createInsertSchema(loadingSheetDockets).omit({ id: true });
 export const insertManifestSchema = createInsertSchema(manifests).omit({ id: true, generatedAt: true });

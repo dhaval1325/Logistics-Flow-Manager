@@ -27,7 +27,33 @@ export const errorSchemas = {
   }),
 };
 
+const weeklyPointSchema = z.object({
+  name: z.string(),
+  dockets: z.number(),
+  revenue: z.number(),
+});
+
+const dashboardSchema = z.object({
+  updatedAt: z.string(),
+  stats: z.object({
+    activeDockets: z.number(),
+    vehiclesInTransit: z.number(),
+    pendingPods: z.number(),
+    completedToday: z.number(),
+  }),
+  weekly: z.array(weeklyPointSchema),
+});
+
 export const api = {
+  dashboard: {
+    get: {
+      method: 'GET' as const,
+      path: '/api/dashboard' as const,
+      responses: {
+        200: dashboardSchema,
+      },
+    },
+  },
   dockets: {
     list: {
       method: 'GET' as const,
@@ -86,6 +112,14 @@ export const api = {
       responses: {
         201: z.custom<typeof loadingSheets.$inferSelect>(),
         400: errorSchemas.validation,
+      },
+    },
+    finalize: {
+      method: 'POST' as const,
+      path: '/api/loading-sheets/:id/finalize' as const,
+      responses: {
+        200: z.custom<typeof loadingSheets.$inferSelect>(),
+        404: errorSchemas.notFound,
       },
     },
     get: {
@@ -151,6 +185,14 @@ export const api = {
     },
   },
   pods: {
+    upload: {
+      method: 'POST' as const,
+      path: '/api/pods/upload' as const,
+      responses: {
+        201: z.custom<typeof pods.$inferSelect>(),
+        400: errorSchemas.validation,
+      },
+    },
     create: {
       method: 'POST' as const,
       path: '/api/pods' as const,

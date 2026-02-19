@@ -1,4 +1,4 @@
-import { usePods, useCreatePod, useAnalyzePod, useReviewPod } from "@/hooks/use-logistics";
+import { usePods, useUploadPod, useAnalyzePod, useReviewPod } from "@/hooks/use-logistics";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { 
@@ -20,7 +20,9 @@ import { Textarea } from "@/components/ui/textarea";
 
 const uploadSchema = z.object({
   docketId: z.coerce.number().min(1, "Select a docket"),
-  imageUrl: z.string().url("Must be a valid URL (simulated upload)"),
+  imageFile: z
+    .custom<FileList>()
+    .refine((files) => files && files.length === 1, "Select an image"),
 });
 
 export default function PodReview() {
@@ -184,7 +186,7 @@ export default function PodReview() {
 }
 
 function UploadPodForm({ onSuccess }: { onSuccess: () => void }) {
-  const { mutate, isPending } = useCreatePod();
+  const { mutate, isPending } = useUploadPod();
   const { data: dockets } = useDockets({ status: "in_transit" }); // Or delivered
 
   const form = useForm<z.infer<typeof uploadSchema>>({
@@ -193,7 +195,15 @@ function UploadPodForm({ onSuccess }: { onSuccess: () => void }) {
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit((data) => mutate(data as any, { onSuccess }))} className="space-y-4">
+      <form
+        onSubmit={form.handleSubmit((data) => {
+          const formData = new FormData();
+          formData.append("docketId", String(data.docketId));
+          formData.append("image", data.imageFile[0]);
+          mutate(formData, { onSuccess });
+        })}
+        className="space-y-4"
+      >
         <FormField
           control={form.control}
           name="docketId"
@@ -220,15 +230,18 @@ function UploadPodForm({ onSuccess }: { onSuccess: () => void }) {
         />
         <FormField
           control={form.control}
-          name="imageUrl"
+          name="imageFile"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Image URL (Mock)</FormLabel>
-              {/* NOTE: In a real app this would be a file input uploading to S3/Cloudinary */}
+              <FormLabel>Upload Image</FormLabel>
               <FormControl>
-                <Input {...field} placeholder="https://example.com/pod.jpg" />
+                <Input
+                  type="file"
+                  accept="image/*"
+                  onChange={(event) => field.onChange(event.target.files)}
+                />
               </FormControl>
-              <p className="text-xs text-muted-foreground">For this demo, paste any image URL.</p>
+              <p className="text-xs text-muted-foreground">Select a POD image from your computer.</p>
               <FormMessage />
             </FormItem>
           )}

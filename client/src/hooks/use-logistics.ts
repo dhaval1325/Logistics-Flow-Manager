@@ -102,6 +102,26 @@ export function useCreateLoadingSheet() {
   });
 }
 
+export function useFinalizeLoadingSheet() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  return useMutation({
+    mutationFn: async (id: number) => {
+      const url = buildUrl(api.loadingSheets.finalize.path, { id });
+      const res = await fetch(url, { method: "POST" });
+      if (!res.ok) throw new Error("Failed to finalize loading sheet");
+      return api.loadingSheets.finalize.responses[200].parse(await res.json());
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.loadingSheets.list.path] });
+      toast({ title: "Success", description: "Loading sheet finalized" });
+    },
+    onError: (err) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    }
+  });
+}
+
 // ==========================================
 // MANIFESTS
 // ==========================================
@@ -216,6 +236,28 @@ export function useCreatePod() {
   });
 }
 
+export function useUploadPod() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  return useMutation({
+    mutationFn: async (data: FormData) => {
+      const res = await fetch(api.pods.upload.path, {
+        method: "POST",
+        body: data,
+      });
+      if (!res.ok) throw new Error("Failed to upload POD");
+      return api.pods.upload.responses[201].parse(await res.json());
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.pods.list.path] });
+      toast({ title: "Success", description: "POD uploaded, ready for AI analysis" });
+    },
+    onError: (err) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    }
+  });
+}
+
 export function useAnalyzePod() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -257,5 +299,21 @@ export function useReviewPod() {
     onError: (err) => {
       toast({ title: "Error", description: err.message, variant: "destructive" });
     }
+  });
+}
+
+// ==========================================
+// DASHBOARD
+// ==========================================
+
+export function useDashboard() {
+  return useQuery({
+    queryKey: [api.dashboard.get.path],
+    queryFn: async () => {
+      const res = await fetch(api.dashboard.get.path);
+      if (!res.ok) throw new Error("Failed to fetch dashboard");
+      return api.dashboard.get.responses[200].parse(await res.json());
+    },
+    refetchInterval: 5000,
   });
 }

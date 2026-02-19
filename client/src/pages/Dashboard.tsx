@@ -14,16 +14,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Package, Truck, AlertTriangle, CheckCircle2 } from "lucide-react";
 import { motion } from "framer-motion";
-
-const data = [
-  { name: 'Mon', dockets: 40, revenue: 2400 },
-  { name: 'Tue', dockets: 30, revenue: 1398 },
-  { name: 'Wed', dockets: 20, revenue: 9800 },
-  { name: 'Thu', dockets: 27, revenue: 3908 },
-  { name: 'Fri', dockets: 18, revenue: 4800 },
-  { name: 'Sat', dockets: 23, revenue: 3800 },
-  { name: 'Sun', dockets: 34, revenue: 4300 },
-];
+import { useDashboard } from "@/hooks/use-logistics";
 
 const StatCard = ({ title, value, icon: Icon, color, trend }: any) => (
   <motion.div 
@@ -62,6 +53,10 @@ const StatCard = ({ title, value, icon: Icon, color, trend }: any) => (
 );
 
 export default function Dashboard() {
+  const { data, isLoading } = useDashboard();
+  const stats = data?.stats;
+  const weekly = data?.weekly ?? [];
+
   return (
     <div className="space-y-8">
       <div className="flex items-center justify-between">
@@ -70,15 +65,15 @@ export default function Dashboard() {
           <p className="text-muted-foreground mt-1">Real-time logistics analytics and insights.</p>
         </div>
         <div className="text-sm text-muted-foreground font-mono">
-          Last updated: {new Date().toLocaleTimeString()}
+          Last updated: {data ? new Date(data.updatedAt).toLocaleTimeString() : "—"}
         </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard title="Active Dockets" value="1,284" icon={Package} color="#3b82f6" trend="12" />
-        <StatCard title="Vehicles in Transit" value="45" icon={Truck} color="#8b5cf6" trend="5" />
-        <StatCard title="Pending PODs" value="23" icon={AlertTriangle} color="#f59e0b" />
-        <StatCard title="Completed Today" value="156" icon={CheckCircle2} color="#10b981" trend="18" />
+        <StatCard title="Active Dockets" value={isLoading ? "—" : stats?.activeDockets ?? 0} icon={Package} color="#3b82f6" />
+        <StatCard title="Vehicles in Transit" value={isLoading ? "—" : stats?.vehiclesInTransit ?? 0} icon={Truck} color="#8b5cf6" />
+        <StatCard title="Pending PODs" value={isLoading ? "—" : stats?.pendingPods ?? 0} icon={AlertTriangle} color="#f59e0b" />
+        <StatCard title="Completed Today" value={isLoading ? "—" : stats?.completedToday ?? 0} icon={CheckCircle2} color="#10b981" />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -93,7 +88,7 @@ export default function Dashboard() {
             </CardHeader>
             <CardContent className="h-[300px]">
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={data}>
+                <AreaChart data={weekly}>
                   <defs>
                     <linearGradient id="colorDockets" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3}/>
@@ -146,7 +141,7 @@ export default function Dashboard() {
             </CardHeader>
             <CardContent className="h-[300px]">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={data}>
+                <BarChart data={weekly}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
                   <XAxis 
                     dataKey="name" 

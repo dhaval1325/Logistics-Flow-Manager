@@ -5,11 +5,35 @@ import { storage } from "./storage";
 import { api } from "@shared/routes";
 import { z } from "zod";
 import { openai } from "./replit_integrations/image/client";
+import multer from "multer";
+import fs from "fs";
+import path from "path";
 
 export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
+  const uploadsDir = path.resolve(process.cwd(), "uploads");
+  if (!fs.existsSync(uploadsDir)) {
+    fs.mkdirSync(uploadsDir, { recursive: true });
+  }
+
+  const upload = multer({
+    storage: multer.diskStorage({
+      destination: uploadsDir,
+      filename: (_req, file, cb) => {
+        const ext = path.extname(file.originalname || "");
+        const name = `${Date.now()}-${Math.random().toString(36).slice(2)}${ext}`;
+        cb(null, name);
+      },
+    }),
+    limits: { fileSize: 5 * 1024 * 1024 },
+  });
+
+  app.get(api.dashboard.get.path, async (_req, res) => {
+    const dashboard = await storage.getDashboardStats();
+    res.json(dashboard);
+  });
 
   // Dockets
   app.get(api.dockets.list.path, async (req, res) => {
@@ -60,6 +84,11 @@ export async function registerRoutes(
     const input = api.loadingSheets.create.input.parse(req.body);
     const sheet = await storage.createLoadingSheet(input);
     res.status(201).json(sheet);
+  });
+
+  app.post(api.loadingSheets.finalize.path, async (req, res) => {
+    const sheet = await storage.finalizeLoadingSheet(Number(req.params.id));
+    res.json(sheet);
   });
 
 
@@ -113,6 +142,21 @@ export async function registerRoutes(
     res.status(201).json(pod);
   });
 
+  app.post(api.pods.upload.path, upload.single("image"), async (req, res) => {
+    const docketId = Number(req.body.docketId);
+    if (!docketId) {
+      return res.status(400).json({ message: "docketId is required" });
+    }
+    const file = (req as any).file;
+    if (!file) {
+      return res.status(400).json({ message: "image file is required" });
+    }
+
+    const imageUrl = `/uploads/${file.filename}`;
+    const pod = await storage.createPod({ docketId, imageUrl });
+    res.status(201).json(pod);
+  });
+
   app.post(api.pods.review.path, async (req, res) => {
     const { status, rejectionReason } = api.pods.review.input.parse(req.body);
     const pod = await storage.updatePodReview(Number(req.params.id), status, rejectionReason);
@@ -125,6 +169,9 @@ export async function registerRoutes(
     if (!pod) return res.status(404).json({ message: "POD not found" });
 
     try {
+      if (!openai) {
+        throw new Error("AI_INTEGRATIONS_OPENAI_API_KEY is not set.");
+      }
       // Analyze with OpenAI
       // Note: In a real app, we'd handle the image URL properly. 
       // If it's a local upload (data URL or relative path), we might need to handle it.
