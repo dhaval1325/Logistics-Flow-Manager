@@ -1,7 +1,8 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { useDockets, useCreateDocket, useDocket } from "@/hooks/use-logistics";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { 
   Table, 
   TableBody, 
@@ -17,7 +18,16 @@ import {
   DialogTitle, 
   DialogTrigger 
 } from "@/components/ui/dialog";
-import { Plus, Search, Loader2 } from "lucide-react";
+import { 
+  ClipboardList, 
+  FileText, 
+  Loader2, 
+  Plus, 
+  Search, 
+  Truck, 
+  User, 
+  Users 
+} from "lucide-react";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -28,6 +38,21 @@ import { Card, CardContent } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { openPrintWindow } from "@/lib/print";
 import type { LoadingSheet, Manifest, Pod, Thc } from "@shared/schema";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 
 const itemSchema = insertDocketItemSchema.extend({
   weight: z.coerce.number(),
@@ -67,6 +92,28 @@ const formSchema = insertDocketSchema.extend({
 });
 
 type FormData = z.infer<typeof formSchema>;
+
+function SimpleField({
+  label,
+  required,
+  className,
+  children,
+}: {
+  label: string;
+  required?: boolean;
+  className?: string;
+  children: ReactNode;
+}) {
+  return (
+    <div className={`space-y-2 ${className ?? ""}`.trim()}>
+      <Label className="text-xs font-semibold text-muted-foreground">
+        {label}
+        {required ? <span className="text-destructive"> *</span> : null}
+      </Label>
+      {children}
+    </div>
+  );
+}
 
 export default function Dockets() {
   const [search, setSearch] = useState("");
@@ -439,144 +486,540 @@ function CreateDocketForm({ onSuccess }: { onSuccess: () => void }) {
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-        <div className="grid grid-cols-2 gap-4">
-          <FormField
-            control={form.control}
-            name="docketNumber"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Docket Number</FormLabel>
-                <FormControl>
-                  <Input {...field} className="font-mono" />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          {/* Add pickup date etc if needed */}
-        </div>
+        <Accordion
+          type="multiple"
+          defaultValue={["basic", "consignor", "consignee", "invoice", "items", "freight"]}
+          className="space-y-4"
+        >
+          <AccordionItem value="basic" className="border-none">
+            <Card className="overflow-hidden">
+              <AccordionTrigger className="px-4 py-3 hover:no-underline">
+                <div className="flex items-center gap-2 text-primary font-semibold">
+                  <ClipboardList className="h-4 w-4" />
+                  Basic Detail
+                </div>
+              </AccordionTrigger>
+              <AccordionContent className="px-4 pb-4">
+                <div className="grid gap-4 md:grid-cols-3">
+                  <FormField
+                    control={form.control}
+                    name="docketNumber"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Docket / GCN No *</FormLabel>
+                        <FormControl>
+                          <Input {...field} className="font-mono" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <SimpleField label="GCN Date" required>
+                    <Input type="datetime-local" />
+                  </SimpleField>
+                  <SimpleField label="GCN Mode" required>
+                    <Select>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select mode" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="road">Road</SelectItem>
+                        <SelectItem value="air">Air</SelectItem>
+                        <SelectItem value="rail">Rail</SelectItem>
+                        <SelectItem value="sea">Sea</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </SimpleField>
+                </div>
 
-        <div className="grid grid-cols-2 gap-6">
-          <div className="space-y-4 p-4 rounded-lg bg-blue-50/50 border border-blue-100">
-            <h3 className="font-semibold text-blue-900">Sender Details</h3>
-            <FormField
-              control={form.control}
-              name="senderName"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Name</FormLabel>
-                  <FormControl><Input {...field} /></FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="senderAddress"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Address</FormLabel>
-                  <FormControl><Input {...field} /></FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-          </div>
+                <div className="mt-4 grid gap-4 md:grid-cols-3">
+                  <SimpleField label="PRQ No">
+                    <Input placeholder="PRQ-0000" />
+                  </SimpleField>
+                  <SimpleField label="Payment Type" required>
+                    <Select>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select payment type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="paid">Paid</SelectItem>
+                        <SelectItem value="to-pay">To Pay</SelectItem>
+                        <SelectItem value="tbb">TBB</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </SimpleField>
+                  <SimpleField label="Billing Party" required>
+                    <Select>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select billing party" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="consignor">Consignor</SelectItem>
+                        <SelectItem value="consignee">Consignee</SelectItem>
+                        <SelectItem value="third-party">Third Party</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </SimpleField>
+                </div>
 
-          <div className="space-y-4 p-4 rounded-lg bg-purple-50/50 border border-purple-100">
-            <h3 className="font-semibold text-purple-900">Receiver Details</h3>
-            <FormField
-              control={form.control}
-              name="receiverName"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Name</FormLabel>
-                  <FormControl><Input {...field} /></FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="receiverAddress"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Address</FormLabel>
-                  <FormControl><Input {...field} /></FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-          </div>
-        </div>
+                <div className="mt-4 grid gap-4 md:grid-cols-3">
+                  <SimpleField label="Origin" required>
+                    <Input placeholder="City code" />
+                  </SimpleField>
+                  <SimpleField label="From City" required>
+                    <Input placeholder="City name and pin" />
+                  </SimpleField>
+                  <SimpleField label="To City" required>
+                    <Input placeholder="City name and pin" />
+                  </SimpleField>
+                </div>
 
-        <div className="space-y-4">
-          <div className="flex justify-between items-center">
-            <h3 className="font-semibold">Items</h3>
-            <Button type="button" variant="outline" size="sm" onClick={() => append({ description: "", weight: 0, quantity: 1, packageType: "box" })}>
-              <Plus className="w-4 h-4 mr-1" /> Add Item
-            </Button>
-          </div>
-          
-          {fields.map((field, index) => (
-            <div key={field.id} className="grid grid-cols-12 gap-2 items-end">
-              <div className="col-span-5">
-                <FormField
-                  control={form.control}
-                  name={`items.${index}.description`}
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-xs">Description</FormLabel>
-                      <FormControl><Input {...field} /></FormControl>
-                    </FormItem>
-                  )}
-                />
-              </div>
-              <div className="col-span-2">
-                <FormField
-                  control={form.control}
-                  name={`items.${index}.packageType`}
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-xs">Type</FormLabel>
-                      <FormControl><Input {...field} /></FormControl>
-                    </FormItem>
-                  )}
-                />
-              </div>
-              <div className="col-span-2">
-                <FormField
-                  control={form.control}
-                  name={`items.${index}.weight`}
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-xs">Weight (kg)</FormLabel>
-                      <FormControl><Input type="number" {...field} /></FormControl>
-                    </FormItem>
-                  )}
-                />
-              </div>
-              <div className="col-span-2">
-                <FormField
-                  control={form.control}
-                  name={`items.${index}.quantity`}
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-xs">Qty</FormLabel>
-                      <FormControl><Input type="number" {...field} /></FormControl>
-                    </FormItem>
-                  )}
-                />
-              </div>
-              <div className="col-span-1">
-                <Button type="button" variant="ghost" size="icon" onClick={() => remove(index)} className="text-destructive">
-                  <span className="sr-only">Delete</span>
-                  &times;
-                </Button>
-              </div>
-            </div>
-          ))}
-        </div>
+                <div className="mt-4 grid gap-4 md:grid-cols-3">
+                  <SimpleField label="Destination" required>
+                    <Input placeholder="Destination hub" />
+                  </SimpleField>
+                  <SimpleField label="Transport Mode" required>
+                    <Select>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select transport mode" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="full-load">Full Load</SelectItem>
+                        <SelectItem value="part-load">Part Load</SelectItem>
+                        <SelectItem value="courier">Courier</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </SimpleField>
+                  <SimpleField label="EDD Date">
+                    <Input type="datetime-local" />
+                  </SimpleField>
+                </div>
+
+                <div className="mt-4 grid gap-4 md:grid-cols-3">
+                  <SimpleField label="Packaging Type">
+                    <Select>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select packaging" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="box">Box</SelectItem>
+                        <SelectItem value="bag">Bag</SelectItem>
+                        <SelectItem value="pallet">Pallet</SelectItem>
+                        <SelectItem value="crate">Crate</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </SimpleField>
+                  <SimpleField label="Risk" required>
+                    <Select>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select risk" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="carrier">Carrier</SelectItem>
+                        <SelectItem value="owner">Owner</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </SimpleField>
+                  <SimpleField label="Delivery Type" required>
+                    <Select>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select delivery type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="door">Door Delivery</SelectItem>
+                        <SelectItem value="godown">Godown Delivery</SelectItem>
+                        <SelectItem value="pickup">Pickup</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </SimpleField>
+                </div>
+
+                <div className="mt-4 grid gap-4 md:grid-cols-2">
+                  <SimpleField label="Distance From Google">
+                    <div className="flex h-9 items-center justify-between rounded-md border border-input bg-background px-3">
+                      <span className="text-sm text-muted-foreground">Auto-calculate</span>
+                      <Switch />
+                    </div>
+                  </SimpleField>
+                  <SimpleField label="Distance (km)">
+                    <Input type="number" placeholder="0" />
+                  </SimpleField>
+                </div>
+
+                <div className="mt-4 grid gap-3 md:grid-cols-4">
+                  <SimpleField label="Consignor same as Billing Party">
+                    <div className="flex h-9 items-center justify-between rounded-md border border-input bg-background px-3">
+                      <span className="text-sm text-muted-foreground">Enable</span>
+                      <Switch />
+                    </div>
+                  </SimpleField>
+                  <SimpleField label="Consignee same as Billing Party">
+                    <div className="flex h-9 items-center justify-between rounded-md border border-input bg-background px-3">
+                      <span className="text-sm text-muted-foreground">Enable</span>
+                      <Switch />
+                    </div>
+                  </SimpleField>
+                  <SimpleField label="Volumetric">
+                    <div className="flex h-9 items-center justify-between rounded-md border border-input bg-background px-3">
+                      <span className="text-sm text-muted-foreground">Enable</span>
+                      <Switch />
+                    </div>
+                  </SimpleField>
+                  <SimpleField label="Individual">
+                    <div className="flex h-9 items-center justify-between rounded-md border border-input bg-background px-3">
+                      <span className="text-sm text-muted-foreground">Enable</span>
+                      <Switch />
+                    </div>
+                  </SimpleField>
+                </div>
+              </AccordionContent>
+            </Card>
+          </AccordionItem>
+
+          <AccordionItem value="consignor" className="border-none">
+            <Card className="overflow-hidden">
+              <AccordionTrigger className="px-4 py-3 hover:no-underline">
+                <div className="flex items-center gap-2 text-primary font-semibold">
+                  <User className="h-4 w-4" />
+                  Consignor Details
+                </div>
+              </AccordionTrigger>
+              <AccordionContent className="px-4 pb-4">
+                <div className="grid gap-4 md:grid-cols-3">
+                  <FormField
+                    control={form.control}
+                    name="senderName"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Consignor Name *</FormLabel>
+                        <FormControl><Input {...field} /></FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <SimpleField label="Contact Number" required>
+                    <Input placeholder="Phone number" />
+                  </SimpleField>
+                  <SimpleField label="Alternate Contact No">
+                    <Input placeholder="Alternate number" />
+                  </SimpleField>
+                </div>
+                <div className="mt-4 grid gap-4 md:grid-cols-3">
+                  <FormField
+                    control={form.control}
+                    name="senderAddress"
+                    render={({ field }) => (
+                      <FormItem className="md:col-span-2">
+                        <FormLabel>Consignor Address *</FormLabel>
+                        <FormControl><Textarea {...field} className="min-h-[80px]" /></FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <SimpleField label="Consignor GST Number" required>
+                    <Input placeholder="GSTIN" />
+                  </SimpleField>
+                </div>
+              </AccordionContent>
+            </Card>
+          </AccordionItem>
+
+          <AccordionItem value="consignee" className="border-none">
+            <Card className="overflow-hidden">
+              <AccordionTrigger className="px-4 py-3 hover:no-underline">
+                <div className="flex items-center gap-2 text-primary font-semibold">
+                  <Users className="h-4 w-4" />
+                  Consignee Details
+                </div>
+              </AccordionTrigger>
+              <AccordionContent className="px-4 pb-4">
+                <div className="grid gap-4 md:grid-cols-3">
+                  <FormField
+                    control={form.control}
+                    name="receiverName"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Consignee Name *</FormLabel>
+                        <FormControl><Input {...field} /></FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <SimpleField label="Contact Number" required>
+                    <Input placeholder="Phone number" />
+                  </SimpleField>
+                  <SimpleField label="Alternate Contact No">
+                    <Input placeholder="Alternate number" />
+                  </SimpleField>
+                </div>
+                <div className="mt-4 grid gap-4 md:grid-cols-3">
+                  <FormField
+                    control={form.control}
+                    name="receiverAddress"
+                    render={({ field }) => (
+                      <FormItem className="md:col-span-2">
+                        <FormLabel>Consignee Address *</FormLabel>
+                        <FormControl><Textarea {...field} className="min-h-[80px]" /></FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <SimpleField label="Consignee GST Number" required>
+                    <Input placeholder="GSTIN" />
+                  </SimpleField>
+                </div>
+              </AccordionContent>
+            </Card>
+          </AccordionItem>
+
+          <AccordionItem value="invoice" className="border-none">
+            <Card className="overflow-hidden">
+              <AccordionTrigger className="px-4 py-3 hover:no-underline">
+                <div className="flex items-center gap-2 text-primary font-semibold">
+                  <FileText className="h-4 w-4" />
+                  Invoice Details
+                </div>
+              </AccordionTrigger>
+              <AccordionContent className="px-4 pb-4">
+                <div className="grid gap-4 md:grid-cols-3">
+                  <SimpleField label="Eway Bill No">
+                    <Input placeholder="Eway bill no" />
+                  </SimpleField>
+                  <SimpleField label="Eway Bill Date">
+                    <Input type="date" />
+                  </SimpleField>
+                  <SimpleField label="Eway Bill Expiry Date">
+                    <Input type="date" />
+                  </SimpleField>
+                </div>
+
+                <div className="mt-4 grid gap-4 md:grid-cols-3">
+                  <SimpleField label="Invoice No" required>
+                    <Input placeholder="Invoice number" />
+                  </SimpleField>
+                  <SimpleField label="Invoice Date" required>
+                    <Input type="date" />
+                  </SimpleField>
+                  <SimpleField label="Invoice Amount" required>
+                    <Input type="number" placeholder="0.00" />
+                  </SimpleField>
+                </div>
+
+                <div className="mt-4 grid gap-4 md:grid-cols-3">
+                  <SimpleField label="No Of Package" required>
+                    <Input type="number" placeholder="0" />
+                  </SimpleField>
+                  <SimpleField label="Actual Weight (KG)" required>
+                    <Input type="number" placeholder="0.00" />
+                  </SimpleField>
+                  <SimpleField label="Cubic Weight">
+                    <Input type="number" placeholder="0.00" readOnly className="bg-muted/40" />
+                  </SimpleField>
+                </div>
+
+                <div className="mt-4 grid gap-4 md:grid-cols-3">
+                  <SimpleField label="Charged Weight (KG)" required>
+                    <Input type="number" placeholder="0.00" />
+                  </SimpleField>
+                  <SimpleField label="Material Name">
+                    <Input placeholder="Material name" />
+                  </SimpleField>
+                  <SimpleField label="Material Density">
+                    <Select>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select density" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="low">Low</SelectItem>
+                        <SelectItem value="medium">Medium</SelectItem>
+                        <SelectItem value="high">High</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </SimpleField>
+                </div>
+
+                <div className="mt-4 grid gap-4 md:grid-cols-3">
+                  <SimpleField label="Packaging Type">
+                    <Select>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select packaging" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="box">Box</SelectItem>
+                        <SelectItem value="bag">Bag</SelectItem>
+                        <SelectItem value="pallet">Pallet</SelectItem>
+                        <SelectItem value="crate">Crate</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </SimpleField>
+                  <SimpleField label="GST Exempt">
+                    <div className="flex h-9 items-center justify-between rounded-md border border-input bg-background px-3">
+                      <span className="text-sm text-muted-foreground">Enable</span>
+                      <Switch />
+                    </div>
+                  </SimpleField>
+                </div>
+              </AccordionContent>
+            </Card>
+          </AccordionItem>
+
+          <AccordionItem value="items" className="border-none">
+            <Card className="overflow-hidden">
+              <AccordionTrigger className="px-4 py-3 hover:no-underline">
+                <div className="flex items-center gap-2 text-primary font-semibold">
+                  <ClipboardList className="h-4 w-4" />
+                  Items
+                </div>
+              </AccordionTrigger>
+              <AccordionContent className="px-4 pb-4">
+                <div className="flex justify-between items-center mb-3">
+                  <h3 className="font-semibold text-sm text-muted-foreground">Items</h3>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => append({ description: "", weight: 0, quantity: 1, packageType: "box" })}
+                  >
+                    <Plus className="w-4 h-4 mr-1" /> Add Item
+                  </Button>
+                </div>
+
+                {fields.map((field, index) => (
+                  <div key={field.id} className="grid grid-cols-12 gap-2 items-end">
+                    <div className="col-span-5">
+                      <FormField
+                        control={form.control}
+                        name={`items.${index}.description`}
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-xs">Description</FormLabel>
+                            <FormControl><Input {...field} /></FormControl>
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                    <div className="col-span-2">
+                      <FormField
+                        control={form.control}
+                        name={`items.${index}.packageType`}
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-xs">Type</FormLabel>
+                            <FormControl><Input {...field} /></FormControl>
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                    <div className="col-span-2">
+                      <FormField
+                        control={form.control}
+                        name={`items.${index}.weight`}
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-xs">Weight (kg)</FormLabel>
+                            <FormControl><Input type="number" {...field} /></FormControl>
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                    <div className="col-span-2">
+                      <FormField
+                        control={form.control}
+                        name={`items.${index}.quantity`}
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-xs">Qty</FormLabel>
+                            <FormControl><Input type="number" {...field} /></FormControl>
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                    <div className="col-span-1">
+                      <Button type="button" variant="ghost" size="icon" onClick={() => remove(index)} className="text-destructive">
+                        <span className="sr-only">Delete</span>
+                        &times;
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </AccordionContent>
+            </Card>
+          </AccordionItem>
+
+          <AccordionItem value="freight" className="border-none">
+            <Card className="overflow-hidden">
+              <AccordionTrigger className="px-4 py-3 hover:no-underline">
+                <div className="flex items-center gap-2 text-primary font-semibold">
+                  <Truck className="h-4 w-4" />
+                  Freight Details
+                </div>
+              </AccordionTrigger>
+              <AccordionContent className="px-4 pb-4">
+                <div className="grid gap-4 md:grid-cols-3">
+                  <SimpleField label="Freight Rate" required>
+                    <Input type="number" placeholder="0.00" />
+                  </SimpleField>
+                  <SimpleField label="Freight Rate Type">
+                    <Select>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select rate type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="per-kg">Per KG</SelectItem>
+                        <SelectItem value="per-package">Per Package</SelectItem>
+                        <SelectItem value="flat">Flat</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </SimpleField>
+                  <SimpleField label="Freight Amount" required>
+                    <Input type="number" placeholder="0.00" />
+                  </SimpleField>
+                </div>
+
+                <div className="mt-4 grid gap-4 md:grid-cols-3">
+                  <SimpleField label="Other Amount">
+                    <Input type="number" placeholder="0.00" />
+                  </SimpleField>
+                  <SimpleField label="Gross Amount">
+                    <Input type="number" placeholder="0.00" readOnly className="bg-muted/40" />
+                  </SimpleField>
+                  <SimpleField label="RCM">
+                    <Select>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select RCM" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="yes">Yes</SelectItem>
+                        <SelectItem value="no">No</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </SimpleField>
+                </div>
+
+                <div className="mt-4 grid gap-4 md:grid-cols-3">
+                  <SimpleField label="SAC">
+                    <Input placeholder="Service accounting code" />
+                  </SimpleField>
+                  <SimpleField label="GST Rate (%)">
+                    <Input type="number" placeholder="0" />
+                  </SimpleField>
+                  <SimpleField label="GST Charged Amount">
+                    <Input type="number" placeholder="0.00" readOnly className="bg-muted/40" />
+                  </SimpleField>
+                </div>
+
+                <div className="mt-4 grid gap-4 md:grid-cols-2">
+                  <SimpleField label="GST Amount">
+                    <Input type="number" placeholder="0.00" readOnly className="bg-muted/40" />
+                  </SimpleField>
+                  <SimpleField label="Grand Total Amount">
+                    <Input type="number" placeholder="0.00" readOnly className="bg-muted/40" />
+                  </SimpleField>
+                </div>
+              </AccordionContent>
+            </Card>
+          </AccordionItem>
+        </Accordion>
 
         <div className="rounded-lg border border-dashed border-border p-4 text-sm text-muted-foreground">
           Geofence and current location coordinates are auto-filled from sender and receiver

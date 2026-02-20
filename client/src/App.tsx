@@ -8,9 +8,14 @@ import { Sidebar } from "@/components/Sidebar";
 import { Topbar } from "@/components/Topbar";
 import Dashboard from "@/pages/Dashboard";
 import Dockets from "@/pages/Dockets";
+import GCNEntry from "@/pages/GCNEntry";
+import GcnPreview from "@/pages/GcnPreview";
 import LoadingSheets from "@/pages/LoadingSheets";
+import LoadingSheetCreate from "@/pages/LoadingSheetCreate";
 import Manifests from "@/pages/Manifests";
+import ManifestCreate from "@/pages/ManifestCreate";
 import ThcManagement from "@/pages/ThcManagement";
+import ThcCreate from "@/pages/ThcCreate";
 import PodReview from "@/pages/PodReview";
 import DocketTracker from "@/pages/DocketTracker";
 import AuditLogs from "@/pages/AuditLogs";
@@ -29,9 +34,14 @@ function Router() {
           <Switch>
             <Route path="/" component={Dashboard} />
             <Route path="/dockets" component={Dockets} />
+            <Route path="/gcn-entry" component={GCNEntry} />
+            <Route path="/gcn-preview" component={GcnPreview} />
             <Route path="/loading-sheets" component={LoadingSheets} />
+            <Route path="/loading-sheets/new" component={LoadingSheetCreate} />
             <Route path="/manifests" component={Manifests} />
+            <Route path="/manifests/new" component={ManifestCreate} />
             <Route path="/thc" component={ThcManagement} />
+            <Route path="/thc/new" component={ThcCreate} />
             <Route path="/pod" component={PodReview} />
             <Route path="/tracker" component={DocketTracker} />
             <Route path="/audit-logs" component={AuditLogs} />
